@@ -319,17 +319,22 @@ export function buildParamsSchema(): ParamsSchema {
   }
 }
 
+// Audio preprocessing spec — shared by the browser inference layer and the Python
+// trainer. Framing convention is center=False; n_frames is derived (see contract.ts /
+// schema.py). Value-level parity between the two mel implementations is pinned by the
+// golden-vector test in Phase 4c.
+export const AUDIO_SPEC = {
+  sample_rate: 44100,
+  duration_s: 1,
+  pitch: 'C4',
+  n_fft: 2048,
+  hop_length: 512,
+  n_mels: 128,
+  fmin: 20,
+  fmax: 22050,
+  window: 'hann',
+} as const
+
 export function buildAudioSchema(): AudioSchema {
-  return {
-    note: GENERATED,
-    sample_rate: 44100,
-    duration_s: 1,
-    pitch: 'C4',
-    n_fft: 2048,
-    hop_length: 512,
-    n_mels: 128,
-    fmin: 20,
-    fmax: 22050,
-    window: 'hann',
-  }
+  return { note: GENERATED, ...AUDIO_SPEC }
 }

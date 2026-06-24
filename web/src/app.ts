@@ -1,4 +1,5 @@
 import { emit, on } from './events/bus'
+import { matchAudioFile } from './inference'
 import { parseArchive } from './parser'
 import { PARAMS } from './sections/params'
 import type { MinilogueXDPatch } from './types/synth'
@@ -6,10 +7,25 @@ import type { MinilogueXDPatch } from './types/synth'
 /** Wire the whole application: file loading → parse → panel updates. */
 export function initApp(): void {
   initLoad()
+  initAudio()
   initFanout()
   initLibrary()
   initStatus()
   initTooltips()
+}
+
+/** A dropped/browsed audio file → sound-matched patch → events. */
+function initAudio(): void {
+  on('audio:dropped', async ({ file }) => {
+    try {
+      const patch = await matchAudioFile(file)
+      emit('patch:load', { patch, index: 0, total: 1 })
+    } catch (err) {
+      console.error('audio match failed', err)
+      const message = err instanceof Error ? err.message : String(err)
+      emit('file:error', { message: `Could not match ${file.name}: ${message}` })
+    }
+  })
 }
 
 /** A dropped/browsed file → parsed patches → events. */

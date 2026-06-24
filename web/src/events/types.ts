@@ -21,6 +21,7 @@ export interface ParamChange {
  */
 export interface AppEventMap {
   'file:dropped': { file: File }
+  'audio:dropped': { file: File }
   'file:parsed-lib': { name: string; patches: MinilogueXDPatch[] }
   'patch:load': { patch: MinilogueXDPatch; index: number; total: number }
   'param:change': ParamChange

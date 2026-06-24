@@ -37,4 +37,30 @@ describe('acceptFile', () => {
     expect(errored).toHaveBeenCalledOnce()
     expect(errored.mock.calls[0]?.[0].message).toContain('notes.txt')
   })
+
+  it('routes audio files to audio:dropped, not file:dropped', () => {
+    const dropped = vi.fn()
+    const audio = vi.fn()
+    on('file:dropped', dropped)
+    on('audio:dropped', audio)
+
+    const file = new File(['x'], 'tone.wav')
+    acceptFile(file)
+
+    expect(dropped).not.toHaveBeenCalled()
+    expect(audio).toHaveBeenCalledOnce()
+    expect(audio.mock.calls[0]?.[0].file).toBe(file)
+  })
+
+  it('still routes patch files to file:dropped', () => {
+    const dropped = vi.fn()
+    const audio = vi.fn()
+    on('file:dropped', dropped)
+    on('audio:dropped', audio)
+
+    acceptFile(new File(['x'], 'bass.mnlgxdprog'))
+
+    expect(audio).not.toHaveBeenCalled()
+    expect(dropped).toHaveBeenCalledOnce()
+  })
 })

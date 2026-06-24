@@ -19,6 +19,7 @@
   "dependencies": {
     "@awesome.me/webawesome": "^3.9.0",
     "fflate": "^0.8.3",
+    "onnxruntime-web": "^1.27.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -29,6 +30,7 @@
     "tsx": "^4.19.0",
     "typescript": "^6.0.3",
     "vite": "^8.1.0",
+    "vite-plugin-static-copy": "^4.1.1",
     "vitest": "^4.1.9"
   }
 }
