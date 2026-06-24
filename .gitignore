@@ -21,3 +21,5 @@ web/public/ort/
 __pycache__/
 *.py[cod]
 .venv/
+training/checkpoints/
+*.pt

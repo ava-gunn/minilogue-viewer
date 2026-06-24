@@ -92,6 +92,9 @@ def build_real(checkpoint: Path) -> None:
         input_names=[schema.INPUT_NAME],
         output_names=list(schema.OUTPUT_NAMES),
         opset_version=_OPSET,
+        # Pin the legacy TorchScript exporter — known-good for opset 17 + onnxruntime-web.
+        # torch 2.9 flips the default to the dynamo exporter; don't let that change silently.
+        dynamo=False,
     )
 
 
