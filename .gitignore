@@ -10,6 +10,13 @@ playwright-report
 playwright/.cache
 coverage
 
+# onnxruntime-web runtime — copied into web/public/ort by web's postinstall (13 MB)
+web/public/ort/
+
+# Korg preset content — not licensed for redistribution; kept locally for tests
+*.mnlgxdprog
+*.mnlgxdlib
+
 # python training project
 __pycache__/
 *.py[cod]

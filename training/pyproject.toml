@@ -1,0 +1,22 @@
+[project]
+name = "minilogue-xd-training"
+version = "0.1.0"
+description = "Audio -> Minilogue XD parameter sound-matching: data, model, ONNX export"
+requires-python = ">=3.9"
+# Core deps cover schema loading + `export.py --dummy` + the onnxruntime self-check.
+dependencies = [
+    "numpy",
+    "onnx",
+    "onnxruntime",
+]
+
+[project.optional-dependencies]
+# Real training + ONNX export of a trained model (Phase 3/5).
+train = ["torch", "librosa"]
+# XD SysEx recording rig (Phase 4b).
+record = ["mido", "python-rtmidi", "sounddevice", "soundfile"]
+# Surge XT pretraining data (Phase 4a).
+surge = ["pedalboard"]
+
+# No build/install step needed — run entrypoints as modules from the repo root, e.g.
+#   training/.venv/bin/python -m training.export --dummy
