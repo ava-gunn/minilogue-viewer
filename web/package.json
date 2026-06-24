@@ -14,7 +14,9 @@
     "check": "biome check --write",
     "lint": "biome lint",
     "format": "biome format --write",
-    "build:schema": "tsx scripts/build-schema.ts"
+    "build:schema": "tsx scripts/build-schema.ts",
+    "copy:ort": "node scripts/copy-ort.mjs",
+    "postinstall": "node scripts/copy-ort.mjs"
   },
   "dependencies": {
     "@awesome.me/webawesome": "^3.9.0",
@@ -30,7 +32,6 @@
     "tsx": "^4.19.0",
     "typescript": "^6.0.3",
     "vite": "^8.1.0",
-    "vite-plugin-static-copy": "^4.1.1",
     "vitest": "^4.1.9"
   }
 }

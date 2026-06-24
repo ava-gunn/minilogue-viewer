@@ -18,7 +18,11 @@ export function outputsToRawPatch(out: RawOutputs): RawPatch {
   const fields = raw as unknown as Record<string, number | string>
 
   continuousParams.forEach((p, i) => {
-    fields[p.field] = clampRound(out.continuous[i] * p.rawMax, p.rawMin, p.rawMax)
+    fields[p.field] = clampRound(
+      out.continuous[i] * p.rawMax,
+      p.rawMin,
+      p.rawMax,
+    )
   })
 
   let offset = 0

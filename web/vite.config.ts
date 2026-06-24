@@ -1,9 +1,38 @@
-import { defineConfig } from 'vite'
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { defineConfig, type Plugin } from 'vite'
+
+const ortDir = resolve(dirname(fileURLToPath(import.meta.url)), 'public/ort')
+
+// Serve /ort/* as raw static assets in dev, ahead of Vite's transform middleware —
+// which otherwise claims the .mjs glue ort loads at runtime and fails to resolve it
+// (the ?import request resolves against the project root, not public/). In a build,
+// public/ort is copied into dist/ as-is, so no special handling is needed there.
+const serveOrtRuntime = (): Plugin => ({
+  name: 'serve-ort-runtime',
+  configureServer(server) {
+    server.middlewares.use((req, res, next) => {
+      const path = (req.url ?? '').split('?')[0]
+      if (!path.startsWith('/ort/')) return next()
+      try {
+        const body = readFileSync(resolve(ortDir, path.slice('/ort/'.length)))
+        res.setHeader(
+          'Content-Type',
+          path.endsWith('.wasm') ? 'application/wasm' : 'text/javascript',
+        )
+        res.end(body)
+      } catch {
+        next()
+      }
+    })
+  },
+})
 
 export default defineConfig({
   server: { port: 5173, strictPort: true },
-  // ort's wasm runtime is served from /ort/ (public/ort, populated by
-  // scripts/copy-ort.mjs). Exclude it from dep pre-bundling so esbuild doesn't rewrite
-  // the bundled glue's loader into an unresolvable dynamic import.
+  // Keep ort out of dep pre-bundling so esbuild doesn't strip the @vite-ignore on its
+  // runtime wasm-glue import.
   optimizeDeps: { exclude: ['onnxruntime-web', 'onnxruntime-web/wasm'] },
+  plugins: [serveOrtRuntime()],
 })

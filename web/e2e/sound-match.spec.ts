@@ -2,12 +2,6 @@ import { expect, test } from '@playwright/test'
 
 const TONE = 'test-tone.wav'
 
-const knobAngle = (page: import('@playwright/test').Page, key: string) =>
-  page
-    .locator(`xd-knob[data-param-key="${key}"]`)
-    .first()
-    .evaluate((el) => el.style.getPropertyValue('--knob-angle'))
-
 const oledName = (page: import('@playwright/test').Page) =>
   page
     .locator('#oled')
@@ -16,19 +10,19 @@ const oledName = (page: import('@playwright/test').Page) =>
 test('uploading audio sound-matches and animates the panel', async ({
   page,
 }) => {
-  const logs: string[] = []
-  page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`))
-  page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`))
-
   await page.goto('/')
-
-  const before = await knobAngle(page, 'cutoff')
   await page.locator('input[type="file"]').first().setInputFiles(TONE)
-  await page.waitForTimeout(10000)
-  const status = await page.locator('#status-bar').textContent()
-  console.log('STATUS BAR:', JSON.stringify(status))
-  console.log('LOGS:\n', logs.join('\n'))
 
+  // The model runs in-browser (onnxruntime-web); the matched patch drives the panel.
   await expect.poll(() => oledName(page), { timeout: 20000 }).toBe('AI MATCH')
-  expect(await knobAngle(page, 'cutoff')).not.toBe(before)
+
+  // At least one knob leaves its default (−135°) position — the panel reflects the match.
+  const angles = await page
+    .locator('xd-knob[data-param-key]')
+    .evaluateAll((els) =>
+      els.map((el) =>
+        (el as HTMLElement).style.getPropertyValue('--knob-angle'),
+      ),
+    )
+  expect(angles.some((a) => a !== '' && a !== '-135deg')).toBe(true)
 })

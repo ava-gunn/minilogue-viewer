@@ -21,9 +21,10 @@ function initAudio(): void {
       const patch = await matchAudioFile(file)
       emit('patch:load', { patch, index: 0, total: 1 })
     } catch (err) {
-      console.error('audio match failed', err)
       const message = err instanceof Error ? err.message : String(err)
-      emit('file:error', { message: `Could not match ${file.name}: ${message}` })
+      emit('file:error', {
+        message: `Could not match ${file.name}: ${message}`,
+      })
     }
   })
 }
