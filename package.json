@@ -1,32 +1,19 @@
 {
-  "name": "minilogue-xd-viewer",
+  "name": "minilogue-viewer",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:e2e": "playwright test",
-    "check": "biome check --write",
-    "lint": "biome lint",
-    "format": "biome format --write"
-  },
-  "dependencies": {
-    "@awesome.me/webawesome": "^3.9.0",
-    "fflate": "^0.8.3",
-    "zod": "^4.4.3"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^2.5.1",
-    "@playwright/test": "^1.61.1",
-    "@types/node": "^22.20.0",
-    "jsdom": "^29.1.1",
-    "typescript": "^6.0.3",
-    "vite": "^8.1.0",
-    "vitest": "^4.1.9"
+    "dev": "pnpm -C web dev",
+    "build": "pnpm -C web build",
+    "preview": "pnpm -C web preview",
+    "test": "pnpm -C web test",
+    "test:watch": "pnpm -C web test:watch",
+    "test:e2e": "pnpm -C web test:e2e",
+    "check": "pnpm -C web check",
+    "lint": "pnpm -C web lint",
+    "format": "pnpm -C web format",
+    "build:schema": "pnpm -C web build:schema"
   }
 }

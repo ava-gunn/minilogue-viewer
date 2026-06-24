@@ -1,0 +1,628 @@
+{
+  "note": "Generated from web/src/parser/param-spec.ts by `pnpm build:schema`. Do not edit by hand.",
+  "count": 52,
+  "parameters": [
+    {
+      "id": "octave",
+      "field": "octave",
+      "path": "voice.octave",
+      "byte_offset": 16,
+      "bit_width": 8,
+      "type": "discrete",
+      "category": "voice",
+      "cardinality": 5
+    },
+    {
+      "id": "portamento",
+      "field": "portamento",
+      "path": "voice.portamento",
+      "byte_offset": 17,
+      "bit_width": 8,
+      "type": "continuous",
+      "category": "voice",
+      "raw_min": 0,
+      "raw_max": 127
+    },
+    {
+      "id": "voice_mode_depth",
+      "field": "voiceModeDepth",
+      "path": "voice.modeDepth",
+      "byte_offset": 19,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "voice",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "voice_mode",
+      "field": "voiceModeType",
+      "path": "voice.mode",
+      "byte_offset": 21,
+      "bit_width": 8,
+      "type": "discrete",
+      "category": "voice",
+      "cardinality": 5,
+      "values": [
+        "POLY",
+        "ARP",
+        "CHORD",
+        "UNISON",
+        "POLY"
+      ]
+    },
+    {
+      "id": "vco1_wave",
+      "field": "vco1Wave",
+      "path": "vco1.wave",
+      "byte_offset": 22,
+      "bit_width": 8,
+      "type": "discrete",
+      "category": "vco1",
+      "cardinality": 3,
+      "values": [
+        "SQR",
+        "TRI",
+        "SAW"
+      ]
+    },
+    {
+      "id": "vco1_octave",
+      "field": "vco1Octave",
+      "path": "vco1.octave",
+      "byte_offset": 23,
+      "bit_width": 8,
+      "type": "discrete",
+      "category": "vco1",
+      "cardinality": 4
+    },
+    {
+      "id": "vco1_pitch",
+      "field": "vco1Pitch",
+      "path": "vco1.pitch",
+      "byte_offset": 24,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "vco1",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "vco1_shape",
+      "field": "vco1Shape",
+      "path": "vco1.shape",
+      "byte_offset": 26,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "vco1",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "vco2_wave",
+      "field": "vco2Wave",
+      "path": "vco2.wave",
+      "byte_offset": 28,
+      "bit_width": 8,
+      "type": "discrete",
+      "category": "vco2",
+      "cardinality": 3,
+      "values": [
+        "SQR",
+        "TRI",
+        "SAW"
+      ]
+    },
+    {
+      "id": "vco2_octave",
+      "field": "vco2Octave",
+      "path": "vco2.octave",
+      "byte_offset": 29,
+      "bit_width": 8,
+      "type": "discrete",
+      "category": "vco2",
+      "cardinality": 4
+    },
+    {
+      "id": "vco2_pitch",
+      "field": "vco2Pitch",
+      "path": "vco2.pitch",
+      "byte_offset": 30,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "vco2",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "vco2_shape",
+      "field": "vco2Shape",
+      "path": "vco2.shape",
+      "byte_offset": 32,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "vco2",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "sync",
+      "field": "sync",
+      "path": "vco2.sync",
+      "byte_offset": 34,
+      "bit_width": 8,
+      "type": "boolean",
+      "category": "vco2"
+    },
+    {
+      "id": "ring",
+      "field": "ring",
+      "path": "vco2.ring",
+      "byte_offset": 35,
+      "bit_width": 8,
+      "type": "boolean",
+      "category": "vco2"
+    },
+    {
+      "id": "cross_mod_depth",
+      "field": "crossModDepth",
+      "path": "vco2.crossModDepth",
+      "byte_offset": 36,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "vco2",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "multi_type",
+      "field": "multiType",
+      "path": "multi.type",
+      "byte_offset": 38,
+      "bit_width": 8,
+      "type": "discrete",
+      "category": "multi",
+      "cardinality": 3,
+      "values": [
+        "NOISE",
+        "VPM",
+        "USER"
+      ]
+    },
+    {
+      "id": "multi_select_noise",
+      "field": "selectNoise",
+      "path": "multi.select.noise",
+      "byte_offset": 39,
+      "bit_width": 8,
+      "type": "discrete",
+      "category": "multi",
+      "cardinality": 4,
+      "values": [
+        "HIGH",
+        "LOW",
+        "PEAK",
+        "DECIM"
+      ]
+    },
+    {
+      "id": "multi_select_vpm",
+      "field": "selectVPM",
+      "path": "multi.select.vpm",
+      "byte_offset": 40,
+      "bit_width": 8,
+      "type": "discrete",
+      "category": "multi",
+      "cardinality": 16,
+      "values": [
+        "SIN1",
+        "SIN2",
+        "SIN3",
+        "SIN4",
+        "SAW1",
+        "SAW2",
+        "SQU1",
+        "SQU2",
+        "FAT1",
+        "FAT2",
+        "AIR1",
+        "AIR2",
+        "DCY1",
+        "DCY2",
+        "CREEP",
+        "THROAT"
+      ]
+    },
+    {
+      "id": "multi_select_user",
+      "field": "selectUser",
+      "path": "multi.select.user",
+      "byte_offset": 41,
+      "bit_width": 8,
+      "type": "discrete",
+      "category": "multi",
+      "cardinality": 16
+    },
+    {
+      "id": "multi_shape_noise",
+      "field": "shapeNoise",
+      "path": "multi.shape.noise",
+      "byte_offset": 42,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "multi",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "multi_shape_vpm",
+      "field": "shapeVPM",
+      "path": "multi.shape.vpm",
+      "byte_offset": 44,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "multi",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "multi_shape_user",
+      "field": "shapeUser",
+      "path": "multi.shape.user",
+      "byte_offset": 46,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "multi",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "multi_shift_shape_noise",
+      "field": "shiftShapeNoise",
+      "path": "multi.shiftShape.noise",
+      "byte_offset": 48,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "multi",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "multi_shift_shape_vpm",
+      "field": "shiftShapeVPM",
+      "path": "multi.shiftShape.vpm",
+      "byte_offset": 50,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "multi",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "multi_shift_shape_user",
+      "field": "shiftShapeUser",
+      "path": "multi.shiftShape.user",
+      "byte_offset": 52,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "multi",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "mixer_vco1",
+      "field": "vco1Level",
+      "path": "mixer.vco1",
+      "byte_offset": 54,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "mixer",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "mixer_vco2",
+      "field": "vco2Level",
+      "path": "mixer.vco2",
+      "byte_offset": 56,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "mixer",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "mixer_multi",
+      "field": "multiLevel",
+      "path": "mixer.multi",
+      "byte_offset": 58,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "mixer",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "cutoff",
+      "field": "cutoff",
+      "path": "filter.cutoff",
+      "byte_offset": 60,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "filter",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "resonance",
+      "field": "resonance",
+      "path": "filter.resonance",
+      "byte_offset": 62,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "filter",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "filter_drive",
+      "field": "cutoffDrive",
+      "path": "filter.drive",
+      "byte_offset": 64,
+      "bit_width": 8,
+      "type": "discrete",
+      "category": "filter",
+      "cardinality": 3,
+      "values": [
+        "0%",
+        "50%",
+        "100%"
+      ]
+    },
+    {
+      "id": "filter_key_track",
+      "field": "cutoffKeyTrack",
+      "path": "filter.keyTracking",
+      "byte_offset": 65,
+      "bit_width": 8,
+      "type": "discrete",
+      "category": "filter",
+      "cardinality": 3,
+      "values": [
+        "0%",
+        "50%",
+        "100%"
+      ]
+    },
+    {
+      "id": "amp_attack",
+      "field": "ampAttack",
+      "path": "ampEnv.attack",
+      "byte_offset": 66,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "amp_eg",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "amp_decay",
+      "field": "ampDecay",
+      "path": "ampEnv.decay",
+      "byte_offset": 68,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "amp_eg",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "amp_sustain",
+      "field": "ampSustain",
+      "path": "ampEnv.sustain",
+      "byte_offset": 70,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "amp_eg",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "amp_release",
+      "field": "ampRelease",
+      "path": "ampEnv.release",
+      "byte_offset": 72,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "amp_eg",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "eg_attack",
+      "field": "egAttack",
+      "path": "filterEnv.attack",
+      "byte_offset": 74,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "filter_eg",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "eg_decay",
+      "field": "egDecay",
+      "path": "filterEnv.decay",
+      "byte_offset": 76,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "filter_eg",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "eg_int",
+      "field": "egInt",
+      "path": "filterEnv.int",
+      "byte_offset": 78,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "filter_eg",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "eg_target",
+      "field": "egTarget",
+      "path": "filterEnv.target",
+      "byte_offset": 80,
+      "bit_width": 8,
+      "type": "discrete",
+      "category": "filter_eg",
+      "cardinality": 3,
+      "values": [
+        "CUTOFF",
+        "PITCH2",
+        "PITCH"
+      ]
+    },
+    {
+      "id": "lfo_wave",
+      "field": "lfoWave",
+      "path": "lfo.wave",
+      "byte_offset": 81,
+      "bit_width": 8,
+      "type": "discrete",
+      "category": "lfo",
+      "cardinality": 3,
+      "values": [
+        "SQR",
+        "TRI",
+        "SAW"
+      ]
+    },
+    {
+      "id": "lfo_mode",
+      "field": "lfoMode",
+      "path": "lfo.mode",
+      "byte_offset": 82,
+      "bit_width": 8,
+      "type": "discrete",
+      "category": "lfo",
+      "cardinality": 3,
+      "values": [
+        "1-SHOT",
+        "NORMAL",
+        "BPM"
+      ]
+    },
+    {
+      "id": "lfo_rate",
+      "field": "lfoRate",
+      "path": "lfo.rate",
+      "byte_offset": 83,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "lfo",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "lfo_int",
+      "field": "lfoInt",
+      "path": "lfo.int",
+      "byte_offset": 85,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "lfo",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "lfo_target",
+      "field": "lfoTarget",
+      "path": "lfo.target",
+      "byte_offset": 87,
+      "bit_width": 8,
+      "type": "discrete",
+      "category": "lfo",
+      "cardinality": 3,
+      "values": [
+        "CUTOFF",
+        "SHAPE",
+        "PITCH"
+      ]
+    },
+    {
+      "id": "mod_fx_on",
+      "field": "modFxOn",
+      "path": "modFx.on",
+      "byte_offset": 88,
+      "bit_width": 8,
+      "type": "boolean",
+      "category": "mod_fx"
+    },
+    {
+      "id": "delay_on",
+      "field": "delayOn",
+      "path": "delay.on",
+      "byte_offset": 99,
+      "bit_width": 8,
+      "type": "boolean",
+      "category": "delay"
+    },
+    {
+      "id": "delay_time",
+      "field": "delayTime",
+      "path": "delay.time",
+      "byte_offset": 101,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "delay",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "delay_depth",
+      "field": "delayDepth",
+      "path": "delay.depth",
+      "byte_offset": 103,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "delay",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "reverb_on",
+      "field": "reverbOn",
+      "path": "reverb.on",
+      "byte_offset": 105,
+      "bit_width": 8,
+      "type": "boolean",
+      "category": "reverb"
+    },
+    {
+      "id": "reverb_time",
+      "field": "reverbTime",
+      "path": "reverb.time",
+      "byte_offset": 107,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "reverb",
+      "raw_min": 0,
+      "raw_max": 1023
+    },
+    {
+      "id": "reverb_depth",
+      "field": "reverbDepth",
+      "path": "reverb.depth",
+      "byte_offset": 109,
+      "bit_width": 10,
+      "type": "continuous",
+      "category": "reverb",
+      "raw_min": 0,
+      "raw_max": 1023
+    }
+  ]
+}

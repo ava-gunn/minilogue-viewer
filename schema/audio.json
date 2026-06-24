@@ -1,0 +1,12 @@
+{
+  "note": "Generated from web/src/parser/param-spec.ts by `pnpm build:schema`. Do not edit by hand.",
+  "sample_rate": 44100,
+  "duration_s": 1,
+  "pitch": "C4",
+  "n_fft": 2048,
+  "hop_length": 512,
+  "n_mels": 128,
+  "fmin": 20,
+  "fmax": 22050,
+  "window": "hann"
+}
