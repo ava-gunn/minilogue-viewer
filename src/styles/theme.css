@@ -42,8 +42,9 @@ html {
   /* Section divider lines */
   --xd-divider: #44444e;
 
-  /* Fixed design width of the panel (else it fills the viewport). */
-  --xd-min-w: 1700px;
+  /* Design width — sized to hug the control content (≈1131px) plus the
+     chassis/app padding, so the panel isn't padded with dead space. */
+  --xd-min-w: 1250px;
 
   /* Uniform toggle-switch track size (all toggles share these). */
   --xd-toggle-w: 0.85rem;

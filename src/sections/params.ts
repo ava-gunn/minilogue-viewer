@@ -1,4 +1,4 @@
-import { lfoRateDivision, pitchToCents } from '../parser/transforms'
+import { clamp01, lfoRateDivision, pitchToCents } from '../parser/transforms'
 import type { MinilogueXDPatch } from '../types/synth'
 
 /**
@@ -47,11 +47,21 @@ const knob = (
 
 const cents = (get: (p: MinilogueXDPatch) => number) => (p: MinilogueXDPatch) =>
   signed(pitchToCents(raw10(get(p))), '¢')
-// EG/LFO intensity is bipolar: the device shows the signed offset from the
-// 512 center (e.g. raw 521 → +9), not the raw 0..1023 value.
+// VCO pitch is bipolar ±1200¢ (0 at noon); position the dial by cents so it
+// tracks the readout — raw is fine near center, which would skew the dial.
+const pitchPos =
+  (get: (p: MinilogueXDPatch) => number) => (p: MinilogueXDPatch) =>
+    clamp01((pitchToCents(raw10(get(p))) + 1200) / 2400)
+// INT readout: the signed offset from the 512 center (e.g. raw 521 → +9).
 const bipolar =
   (get: (p: MinilogueXDPatch) => number) => (p: MinilogueXDPatch) =>
     signed(raw10(get(p)) - 512, '')
+// LFO INT is a unipolar knob: its positive range uses raw 512..1023, so the
+// dial sweeps from min (raw 512) to full (raw 1023) — a small value like +9
+// sits near the bottom (~8 o'clock), not at noon.
+const intPos =
+  (get: (p: MinilogueXDPatch) => number) => (p: MinilogueXDPatch) =>
+    clamp01((raw10(get(p)) - 512) / 511)
 
 export const PARAMS: ParamDescriptor[] = [
   // VOICE
@@ -85,7 +95,7 @@ export const PARAMS: ParamDescriptor[] = [
   knob(
     'vco1',
     'pitch',
-    (p) => p.vco1.pitch,
+    pitchPos((p) => p.vco1.pitch),
     cents((p) => p.vco1.pitch),
   ),
   knob('vco1', 'shape', (p) => p.vco1.shape),
@@ -106,7 +116,7 @@ export const PARAMS: ParamDescriptor[] = [
   knob(
     'vco2',
     'pitch',
-    (p) => p.vco2.pitch,
+    pitchPos((p) => p.vco2.pitch),
     cents((p) => p.vco2.pitch),
   ),
   knob('vco2', 'shape', (p) => p.vco2.shape),
@@ -197,7 +207,7 @@ export const PARAMS: ParamDescriptor[] = [
   knob(
     'lfo',
     'int',
-    (p) => p.lfo.int,
+    intPos((p) => p.lfo.int),
     bipolar((p) => p.lfo.int),
   ),
   {
