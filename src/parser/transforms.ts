@@ -9,22 +9,39 @@ export const norm10 = (v: number): number => clamp01(v / 1023)
 /** 7-bit raw (0..127) → normalized 0..1. */
 export const norm7 = (v: number): number => clamp01(v / 127)
 
-/**
- * VCO pitch raw (0..1023) → detune in cents (±1200), piecewise per the Korg
- * mapping. ~492..532 is the centered dead zone.
- */
+// VCO pitch curve, calibrated against minilogue xd hardware readings
+// (raw → cents, positive half; mirrored for the negative side). Korg's
+// published MIDI table is a coarser straight-line approximation that reads
+// noticeably sharp in the upper octave (e.g. raw 861 → 774¢ vs the device's
+// 710¢); these breakpoints match what the panel actually displays.
+const PITCH_CURVE: ReadonlyArray<readonly [number, number]> = [
+  [512, 0],
+  [536, 2],
+  [547, 7],
+  [660, 93],
+  [697, 185],
+  [754, 372],
+  [825, 588],
+  [861, 710],
+  [958, 1004],
+  [1023, 1200],
+]
+
+/** VCO pitch raw (0..1023) → detune in cents (±1200), symmetric about 512. */
 export function pitchToCents(v: number): number {
-  let cents: number
-  if (v < 4) cents = -1200
-  else if (v < 356) cents = ((v - 356) * 944) / 352 - 256
-  else if (v < 476) cents = (v - 476) * 2 - 16
-  else if (v < 492) cents = v - 492
-  else if (v < 532) cents = 0
-  else if (v < 548) cents = v - 532
-  else if (v < 668) cents = (v - 548) * 2 + 16
-  else if (v < 1020) cents = ((v - 668) * 944) / 352 + 256
-  else cents = 1200
-  return Math.round(cents)
+  const raw = Math.min(1023, Math.max(0, Math.round(v)))
+  const sign = raw < 512 ? -1 : 1
+  const up = raw < 512 ? 1024 - raw : raw // fold onto the positive half
+  let cents = 1200
+  for (let i = 1; i < PITCH_CURVE.length; i++) {
+    const [r1, c1] = PITCH_CURVE[i] as [number, number]
+    if (up <= r1) {
+      const [r0, c0] = PITCH_CURVE[i - 1] as [number, number]
+      cents = c0 + ((c1 - c0) * (up - r0)) / (r1 - r0)
+      break
+    }
+  }
+  return Math.round(sign * cents)
 }
 
 /**

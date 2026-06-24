@@ -11,21 +11,30 @@ describe('norm10 / norm7', () => {
   })
 })
 
-describe('pitchToCents', () => {
+describe('pitchToCents (hardware-calibrated)', () => {
   it('floors and ceils at ±1200', () => {
     expect(pitchToCents(0)).toBe(-1200)
-    expect(pitchToCents(4)).toBe(-1200)
     expect(pitchToCents(1023)).toBe(1200)
   })
 
-  it('is 0 in the centered dead zone', () => {
+  it('is ~0 at the center', () => {
     expect(pitchToCents(512)).toBe(0)
     expect(pitchToCents(515)).toBe(0)
   })
 
-  it('hits the ±256 inflection points', () => {
-    expect(pitchToCents(356)).toBe(-256)
-    expect(pitchToCents(668)).toBe(256)
+  it('matches measured hardware breakpoints', () => {
+    expect(pitchToCents(547)).toBe(7)
+    expect(pitchToCents(660)).toBe(93)
+    expect(pitchToCents(861)).toBe(710) // "Sharp Fifth"
+    expect(pitchToCents(958)).toBe(1004)
+  })
+
+  it('interpolates between breakpoints', () => {
+    expect(pitchToCents(900)).toBe(828)
+  })
+
+  it('is symmetric about the center', () => {
+    expect(pitchToCents(163)).toBe(-710)
   })
 })
 
