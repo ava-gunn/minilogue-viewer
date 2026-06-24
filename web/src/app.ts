@@ -1,17 +1,15 @@
 import { emit, on } from './events/bus'
 import { matchAudioFile } from './inference'
 import { parseArchive } from './parser'
-import { PARAMS } from './sections/params'
+import { initShared } from './sections/shared'
 import type { MinilogueXDPatch } from './types/synth'
 
-/** Wire the whole application: file loading → parse → panel updates. */
+/** Wire the file-viewer page: file/audio loading → parse → panel updates. */
 export function initApp(): void {
   initLoad()
   initAudio()
-  initFanout()
   initLibrary()
-  initStatus()
-  initTooltips()
+  initShared()
 }
 
 /** A dropped/browsed audio file → sound-matched patch → events. */
@@ -50,22 +48,6 @@ function initLoad(): void {
   })
 }
 
-/** On patch load, push every parameter out to its control. */
-function initFanout(): void {
-  on('patch:load', ({ patch }) => {
-    for (const { section, key, value, display } of PARAMS) {
-      const v = value(patch)
-      const text = display?.(patch)
-      emit(
-        'param:change',
-        text === undefined
-          ? { section, key, value: v }
-          : { section, key, value: v, display: text },
-      )
-    }
-  })
-}
-
 /** Program library drawer for .mnlgxdlib files. */
 function initLibrary(): void {
   on('file:parsed-lib', ({ patches }) => {
@@ -97,52 +79,5 @@ function initLibrary(): void {
     )
     panel.removeAttribute('hidden')
     panel.setAttribute('open', '')
-  })
-}
-
-/** Transient error badge in the status bar. */
-function initStatus(): void {
-  on('file:error', ({ message }) => {
-    const bar = document.getElementById('status-bar')
-    if (!bar) return
-    const badge = document.createElement('wa-badge')
-    badge.setAttribute('variant', 'danger')
-    badge.textContent = message
-    bar.replaceChildren(badge)
-    setTimeout(() => {
-      if (bar.firstChild === badge) bar.replaceChildren()
-    }, 6000)
-  })
-}
-
-/** Hover/focus value readout on each knob via WA tooltips (for=-anchored, so
-    they stay out of the panel's flow and don't affect layout). */
-function initTooltips(): void {
-  const container = document.createElement('div')
-  container.id = 'tooltips'
-  document.body.append(container)
-
-  const tips = new Map<string, HTMLElement>()
-  let i = 0
-  for (const knob of document.querySelectorAll<HTMLElement>(
-    'xd-knob[data-section]',
-  )) {
-    let id = knob.id
-    if (!id) {
-      id = `knob-${i++}`
-      knob.id = id
-    }
-    const tip = document.createElement('wa-tooltip')
-    tip.setAttribute('for', id)
-    tip.setAttribute('placement', 'top')
-    tip.textContent = '—'
-    container.append(tip)
-    tips.set(`${knob.dataset.section}:${knob.dataset.paramKey}`, tip)
-  }
-
-  on('param:change', ({ section, key, display }) => {
-    if (display === undefined) return
-    const tip = tips.get(`${section}:${key}`)
-    if (tip) tip.textContent = display
   })
 }

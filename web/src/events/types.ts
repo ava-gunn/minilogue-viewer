@@ -26,6 +26,18 @@ export interface AppEventMap {
   'patch:load': { patch: MinilogueXDPatch; index: number; total: number }
   'param:change': ParamChange
   'file:error': { message: string }
+  /** Live-MIDI connection state, for the /live page status indicator. */
+  'midi:status': {
+    state:
+      | 'unsupported'
+      | 'requesting'
+      | 'denied'
+      | 'no-device'
+      | 'connected'
+      | 'error'
+    device?: string
+    detail?: string
+  }
 }
 
 export type AppEvent = keyof AppEventMap

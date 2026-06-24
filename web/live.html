@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en" class="wa-dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Minilogue XD — Live</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="live-bar">
+        <a class="live-back" href="/">← File viewer</a>
+        <span id="midi-status" class="midi-status" data-state="requesting">
+          <span class="midi-dot"></span>
+          <span class="midi-text">Requesting MIDI access…</span>
+        </span>
+        <button id="midi-refresh" class="live-refresh" type="button" hidden>Refresh</button>
+        <p id="midi-hint" class="live-hint" hidden>
+          Live knob mirroring needs <strong>MIDI Tx CC = On</strong> (GLOBAL EDIT
+          on the synth). Switching programs refreshes the whole panel automatically.
+        </p>
+      </header>
+
+      <div id="panel-root"></div>
+
+      <!-- Transient status (errors) -->
+      <div id="status-bar" aria-live="polite"></div>
+    </div>
+
+    <script type="module" src="/src/live.ts"></script>
+  </body>
+</html>

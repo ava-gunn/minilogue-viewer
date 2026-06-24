@@ -7,135 +7,15 @@
   </head>
   <body>
     <div id="app">
-    <div class="xd">
-      <!-- Main control panel — a single aligned grid (3 control bands) -->
-      <div class="xd-panel">
-        <!-- PERFORMANCE -->
-        <section class="grp grp-perf" aria-label="Performance">
-          <span class="row-label"></span>
-          <xd-knob label="PORTAMENTO" data-section="voice" data-param-key="portamento"></xd-knob>
+      <div id="panel-root"></div>
 
-          <span class="row-label"></span>
-          <xd-knob label="VOICE MODE DEPTH" data-section="voice" data-param-key="modeDepth"></xd-knob>
+      <!-- Program library drawer (.mnlgxdlib) -->
+      <wa-details id="library-panel" summary="Program Library" hidden>
+        <ol id="program-list"></ol>
+      </wa-details>
 
-          <span class="row-label"></span>
-          <xd-led-group
-            label="VOICE MODE"
-            labels="POLY,UNISON,CHORD,ARP"
-            data-section="voice"
-            data-param-key="mode"
-          ></xd-led-group>
-        </section>
-
-        <!-- VCO 1 / VCO 2 / MULTI ENGINE -->
-        <section class="grp grp-vco" aria-label="Oscillators">
-          <span class="row-label">VCO 1</span>
-          <div class="pair">
-            <xd-wave-selector compact label="WAVE" data-section="vco1" data-param-key="wave"></xd-wave-selector>
-            <xd-switch compact reverse label="OCTAVE" positions="16′,8′,4′,2′" data-section="vco1" data-param-key="octave"></xd-switch>
-          </div>
-          <xd-knob label="PITCH" data-section="vco1" data-param-key="pitch"></xd-knob>
-          <xd-knob label="SHAPE" data-section="vco1" data-param-key="shape"></xd-knob>
-          <div class="pair">
-            <xd-switch compact reverse hide-ticks label="SYNC" positions="OFF,ON" data-section="vco2" data-param-key="sync"></xd-switch>
-            <xd-switch compact reverse hide-ticks label="RING" positions="OFF,ON" data-section="vco2" data-param-key="ring"></xd-switch>
-          </div>
-
-          <span class="row-label">VCO 2</span>
-          <div class="pair">
-            <xd-wave-selector compact label="WAVE" data-section="vco2" data-param-key="wave"></xd-wave-selector>
-            <xd-switch compact reverse label="OCTAVE" positions="16′,8′,4′,2′" data-section="vco2" data-param-key="octave"></xd-switch>
-          </div>
-          <xd-knob label="PITCH" data-section="vco2" data-param-key="pitch"></xd-knob>
-          <xd-knob label="SHAPE" data-section="vco2" data-param-key="shape"></xd-knob>
-          <xd-knob label="CROSS MOD" data-section="vco2" data-param-key="crossModDepth"></xd-knob>
-
-          <span class="row-label">MULTI ENGINE</span>
-          <xd-switch
-            reverse
-            positions="NOISE,VPM,USER"
-            data-section="multi"
-            data-param-key="type"
-          ></xd-switch>
-          <xd-lcd data-section="multi" data-param-key="typeValue" placeholder="----"></xd-lcd>
-          <xd-knob label="TYPE" data-section="multi" data-param-key="typeValue"></xd-knob>
-          <xd-knob label="SHAPE" data-section="multi" data-param-key="shape"></xd-knob>
-        </section>
-
-        <!-- MIXER -->
-        <section class="grp grp-mixer" aria-label="Mixer">
-          <span class="grp-label">MIXER</span>
-          <xd-knob label="VCO 1" data-section="mixer" data-param-key="vco1"></xd-knob>
-          <span class="row-label"></span>
-          <xd-knob label="VCO 2" data-section="mixer" data-param-key="vco2"></xd-knob>
-          <span class="row-label"></span>
-          <xd-knob label="MULTI" data-section="mixer" data-param-key="multi"></xd-knob>
-        </section>
-
-        <!-- FILTER -->
-        <section class="grp grp-filter" aria-label="Filter">
-          <span class="grp-label">FILTER</span>
-          <xd-knob label="CUTOFF" data-section="filter" data-param-key="cutoff"></xd-knob>
-          <span class="row-label"></span>
-          <xd-knob label="RESONANCE" data-section="filter" data-param-key="resonance"></xd-knob>
-          <span class="row-label"></span>
-          <div class="pair">
-            <xd-switch compact reverse hide-ticks label="DRIVE" positions="0,50,100" data-section="filter" data-param-key="drive"></xd-switch>
-            <xd-switch compact reverse hide-ticks label="KEY TRACK" positions="0,50,100" data-section="filter" data-param-key="keyTracking"></xd-switch>
-          </div>
-        </section>
-
-        <!-- AMP EG / EG / LFO -->
-        <section class="grp grp-eg" aria-label="Envelopes and LFO">
-          <span class="row-label">AMP EG</span>
-          <xd-knob label="ATTACK" data-section="ampEnv" data-param-key="attack"></xd-knob>
-          <xd-knob label="DECAY" data-section="ampEnv" data-param-key="decay"></xd-knob>
-          <xd-knob label="SUSTAIN" data-section="ampEnv" data-param-key="sustain"></xd-knob>
-          <xd-knob label="RELEASE" data-section="ampEnv" data-param-key="release"></xd-knob>
-
-          <span class="row-label">EG</span>
-          <xd-knob label="ATTACK" data-section="filterEnv" data-param-key="attack"></xd-knob>
-          <xd-knob label="DECAY" data-section="filterEnv" data-param-key="decay"></xd-knob>
-          <xd-knob label="EG INT" data-section="filterEnv" data-param-key="int"></xd-knob>
-          <xd-switch label="TARGET" positions="PITCH,PITCH 2,CUTOFF" data-section="filterEnv" data-param-key="target"></xd-switch>
-
-          <span class="row-label">LFO</span>
-          <div class="pair pair-lfo">
-            <xd-wave-selector label="WAVE" data-section="lfo" data-param-key="wave"></xd-wave-selector>
-            <xd-switch label="MODE" positions="BPM,NORMAL,1-SHOT" data-section="lfo" data-param-key="mode"></xd-switch>
-          </div>
-          <xd-knob label="RATE" data-section="lfo" data-param-key="rate"></xd-knob>
-          <xd-knob label="INT" data-section="lfo" data-param-key="int"></xd-knob>
-          <xd-switch label="TARGET" positions="PITCH,SHAPE,CUTOFF" data-section="lfo" data-param-key="target"></xd-switch>
-        </section>
-
-        <!-- EFFECTS + DISPLAY -->
-        <section class="grp grp-fx" aria-label="Effects and display">
-          <span class="grp-label">EFFECTS</span>
-          <div class="pair">
-            <xd-switch positions="MOD,REV,DEL" value="1" decorative></xd-switch>
-            <xd-switch positions="ON,OFF" decorative></xd-switch>
-          </div>
-          <xd-knob label="TIME" data-section="reverb" data-param-key="time"></xd-knob>
-          <xd-knob label="DEPTH" data-section="reverb" data-param-key="depth"></xd-knob>
-
-          <span class="row-label"></span>
-          <xd-display id="oled" class="fx-oled"></xd-display>
-        </section>
-      </div>
-
-      <footer class="xd-bottom">
-        <div class="xd-brand">KORG <strong>minilogue</strong> xd</div>
-      </footer>
-    </div>
-
-    <!-- Program library drawer (.mnlgxdlib) -->
-    <wa-details id="library-panel" summary="Program Library" hidden>
-      <ol id="program-list"></ol>
-    </wa-details>
-
-    <!-- Transient status (errors) -->
-    <div id="status-bar" aria-live="polite"></div>
+      <!-- Transient status (errors) -->
+      <div id="status-bar" aria-live="polite"></div>
     </div>
 
     <script type="module" src="/src/main.ts"></script>

@@ -1,0 +1,73 @@
+/* Live-MIDI page: status bar above the shared panel. */
+.live-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--wa-space-m, 1rem);
+  inline-size: var(--xd-min-w);
+  max-inline-size: min(20in, 100%);
+  margin-inline: auto;
+  padding: var(--wa-space-s, 0.5rem) var(--wa-space-l, 1.5rem);
+  font-family: var(--wa-font-family-body, system-ui, sans-serif);
+}
+
+.live-back {
+  color: var(--wa-color-text-quiet, #8a8a93);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+.live-back:hover {
+  color: var(--wa-color-text-normal, #e0e0e6);
+}
+
+.midi-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  font-size: 0.9rem;
+  color: var(--wa-color-text-normal, #e0e0e6);
+}
+
+.midi-dot {
+  inline-size: 0.62em;
+  block-size: 0.62em;
+  border-radius: 50%;
+  background: var(--midi-dot, #8a8a93);
+  box-shadow: 0 0 0.5em var(--midi-dot, transparent);
+}
+.midi-status[data-state="connected"] {
+  --midi-dot: #3ddc84;
+}
+.midi-status[data-state="requesting"],
+.midi-status[data-state="no-device"] {
+  --midi-dot: #e6b800;
+}
+.midi-status[data-state="denied"],
+.midi-status[data-state="unsupported"],
+.midi-status[data-state="error"] {
+  --midi-dot: #ff5757;
+}
+
+.live-refresh {
+  padding: 0.3em 0.95em;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--wa-color-text-normal, #e0e0e6);
+  background: transparent;
+  border: 1px solid var(--xd-divider, #44444e);
+  border-radius: var(--wa-border-radius-m, 6px);
+  cursor: pointer;
+}
+.live-refresh:hover {
+  border-color: var(--wa-color-text-quiet, #8a8a93);
+}
+
+.live-hint {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--wa-color-text-quiet, #8a8a93);
+}
+.live-hint strong {
+  color: var(--wa-color-text-normal, #e0e0e6);
+}

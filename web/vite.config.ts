@@ -3,7 +3,8 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, type Plugin } from 'vite'
 
-const ortDir = resolve(dirname(fileURLToPath(import.meta.url)), 'public/ort')
+const root = dirname(fileURLToPath(import.meta.url))
+const ortDir = resolve(root, 'public/ort')
 
 // Serve /ort/* as raw static assets in dev, ahead of Vite's transform middleware —
 // which otherwise claims the .mjs glue ort loads at runtime and fails to resolve it
@@ -31,6 +32,15 @@ const serveOrtRuntime = (): Plugin => ({
 
 export default defineConfig({
   server: { port: 5173, strictPort: true },
+  // Two pages: the file viewer (index.html) and the live-MIDI mirror (live.html).
+  build: {
+    rollupOptions: {
+      input: {
+        main: resolve(root, 'index.html'),
+        live: resolve(root, 'live.html'),
+      },
+    },
+  },
   // Keep ort out of dep pre-bundling so esbuild doesn't strip the @vite-ignore on its
   // runtime wasm-glue import.
   optimizeDeps: { exclude: ['onnxruntime-web', 'onnxruntime-web/wasm'] },
