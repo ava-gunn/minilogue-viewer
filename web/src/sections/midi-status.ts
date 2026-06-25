@@ -1,8 +1,7 @@
 import { on } from '../events/bus'
 
 const MIDI_MESSAGES: Record<string, string> = {
-  unsupported:
-    'Web MIDI isn’t supported here — open this page in Chrome or Edge.',
+  unsupported: 'Web MIDI isn’t supported in this browser.',
   requesting: 'Connecting to MIDI…',
   denied: 'MIDI access was denied. Reload the page and allow it.',
   'no-device':

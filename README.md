@@ -7,7 +7,7 @@ View, audition, and re-synthesize Korg minilogue xd patches.
 ![screenshot](screenshot.png)
 
 - Load `.mnlgxdprog` / `.mnlgxdlib` files and inspect every parameter on a faithful panel.
-- Mirror a connected minilogue xd live over Web MIDI (Chrome/Edge).
+- Mirror a connected minilogue xd live over Web MIDI.
 - **Resynthesis** — match an audio clip to a patch with the built-in model or Gemini (your own API key), then load it onto the hardware.
 
 ## Ableton extension
