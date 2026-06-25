@@ -67,7 +67,8 @@ const styles = `
   .ticks {
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    /* space-around centers each glyph in its slot to line up with the marker. */
+    justify-content: space-around;
   }
   .wave { display: grid; place-items: center; color: var(--xd-label-color, #8a8a92); }
   .wave svg { display: block; width: var(--xd-wave-w, 1.1rem); height: var(--xd-wave-h, 0.5rem); }
@@ -153,7 +154,7 @@ class XdWaveSelector extends HTMLElement {
     const live = WAVES.find((w) => w.value === this.#live)?.label ?? ''
     const readout =
       this.#live >= 0 && this.#live !== this.#program
-        ? `${prog} (synth ${live})`
+        ? `${prog} (hardware ${live})`
         : prog
     this.setAttribute('aria-label', `${label}: ${readout}`)
   }

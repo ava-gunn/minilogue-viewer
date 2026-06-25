@@ -11,7 +11,7 @@ const styles = `
 
   .lcd {
     min-width: 3.5rem;
-    padding: 0.25rem 0.4rem;
+    padding: 0.4rem 0.4rem;
     border-radius: 3px;
     background: var(--xd-lcd-bg, #04060a);
     color: var(--xd-lcd-text, #e6f2f0);

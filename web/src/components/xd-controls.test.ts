@@ -96,6 +96,6 @@ describe('<xd-led-group>', () => {
     // A diverging live value lights a second (amber) row.
     emit('param:live', { section: 'voice', key: 'mode', value: 0 })
     expect(rows?.[0]?.classList.contains('live')).toBe(true)
-    expect(el.getAttribute('aria-label')).toBe('VOICE: CHORD (synth POLY)')
+    expect(el.getAttribute('aria-label')).toBe('VOICE: CHORD (hardware POLY)')
   })
 })

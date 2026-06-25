@@ -55,7 +55,7 @@ html {
 
   /* Uniform toggle-switch track size (all toggles share these). */
   --xd-toggle-w: 0.85rem;
-  --xd-toggle-h: 2rem;
+  --xd-toggle-h: 2.6rem;
 
   /* Etched panel labels — neutral-60/80 for AA contrast on the dark group surfaces
      (neutral-50/30 came out at ~3.9:1 / ~2:1 against the panel). */

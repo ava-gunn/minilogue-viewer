@@ -124,7 +124,7 @@ class XdLedGroup extends HTMLElement {
     const live = this.#labels[this.#live] ?? String(this.#live)
     const readout =
       this.#live >= 0 && this.#live !== this.#program
-        ? `${prog} (synth ${live})`
+        ? `${prog} (hardware ${live})`
         : prog
     this.setAttribute('aria-label', group ? `${group}: ${readout}` : readout)
   }

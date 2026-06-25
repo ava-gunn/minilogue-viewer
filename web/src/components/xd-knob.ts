@@ -111,7 +111,7 @@ class XdKnob extends HTMLElement {
     const label = this.getAttribute('label') ?? ''
     const readout =
       this.#live !== undefined && this.#live !== this.#program
-        ? `${this.#program} (synth ${this.#live})`
+        ? `${this.#program} (hardware ${this.#live})`
         : this.#program
     this.setAttribute('aria-label', label ? `${label}: ${readout}` : readout)
   }

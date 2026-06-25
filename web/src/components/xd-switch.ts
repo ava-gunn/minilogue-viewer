@@ -54,7 +54,9 @@ const styles = `
   .ticks {
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    /* space-around centers each tick in its slot so it lines up with the marker (the
+       toggle setting), and tightens the inner gaps vs space-between. */
+    justify-content: space-around;
     font-size: 0.45rem;
     letter-spacing: 0.04em;
     color: var(--xd-label-color, #8a8a92);
@@ -157,7 +159,7 @@ class XdSwitch extends HTMLElement {
     const live = this.#positions[this.#live] ?? String(this.#live)
     const readout =
       this.#live >= 0 && this.#live !== this.#program
-        ? `${prog} (synth ${live})`
+        ? `${prog} (hardware ${live})`
         : prog
     this.setAttribute('aria-label', label ? `${label}: ${readout}` : readout)
   }

@@ -5,11 +5,11 @@ import viewerHtml from "./viewer.generated.html"
 const VIEWER_ID = "minilogue-xd-viewer.open"
 
 // The modal is a fixed-size window (the SDK has no auto-fit / post-open resize), so we size it
-// for the tallest common layout: the synth (~408) plus an open library drawer (~700 total; the
+// for the tallest common layout: the synth (~455) plus an open library drawer (~747 total; the
 // program list is capped + scrolls internally — see embed.css). A single program leaves some
 // empty space below, which is unavoidable without a resize API.
 const VIEWER_WIDTH = 1300
-const VIEWER_HEIGHT = 720
+const VIEWER_HEIGHT = 770
 
 // Object scopes the action appears under (mirrors harmony-track). The viewer isn't tied to
 // Live data, so it's offered broadly; right-clicking any of these shows "minilogue xd viewer".

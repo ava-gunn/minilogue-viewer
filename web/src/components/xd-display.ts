@@ -19,7 +19,7 @@ const styles = `
     background: var(--xd-oled-bg, #050507);
     color: var(--xd-oled-text, #e6f2f0);
     border-radius: 0.35rem;
-    padding: 0.4rem 0.7rem;
+    padding: 0.55rem 0.7rem;
     border: 1px solid transparent;
     box-shadow: inset 0 0 0 1px #0009, inset 0 0 12px #00000080;
     min-width: 9rem;
