@@ -23,3 +23,8 @@ __pycache__/
 .venv/
 training/checkpoints/
 *.pt
+
+# generated datasets (audio + manifests) — large, regenerable
+training/data/surge/
+training/data/xd/
+training/data/hard_cases/
