@@ -50,6 +50,8 @@ export interface RawPatch {
   lfoTarget: number
   modFxOn: number
   modFxType: number
+  modFxTime: number
+  modFxDepth: number
   delayOn: number
   delayTime: number
   delayDepth: number
@@ -124,6 +126,8 @@ export function readRawPatch(bytes: Uint8Array): RawPatch {
     lfoTarget: u8(87),
     modFxOn: u8(88),
     modFxType: u8(89),
+    modFxTime: u10(95),
+    modFxDepth: u10(97),
     delayOn: u8(99),
     delayTime: u10(101),
     delayDepth: u10(103),

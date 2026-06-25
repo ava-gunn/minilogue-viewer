@@ -112,7 +112,11 @@ export function parsePatch(raw: RawPatch): MinilogueXDPatch {
       int: norm10(raw.lfoInt),
       target: at(LFO_TARGET, raw.lfoTarget, 'CUTOFF'),
     },
-    modFx: { on: raw.modFxOn !== 0 },
+    modFx: {
+      on: raw.modFxOn !== 0,
+      time: norm10(raw.modFxTime),
+      depth: norm10(raw.modFxDepth),
+    },
     delay: {
       on: raw.delayOn !== 0,
       time: norm10(raw.delayTime),

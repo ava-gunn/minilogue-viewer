@@ -35,9 +35,13 @@ class Backbone(nn.Module):
             nn.Conv2d(32, 64, 3, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(),
-            nn.AdaptiveAvgPool2d(1),
+            # Pool frequency to 1 but keep 10 temporal bins, so the amplitude/filter
+            # envelope (ADSR) survives — averaging over time would erase it.
+            nn.AdaptiveAvgPool2d((1, 10)),
         )
-        self.trunk = nn.Sequential(nn.Flatten(), nn.Linear(64, self.EMBED_DIM), nn.ReLU())
+        self.trunk = nn.Sequential(
+            nn.Flatten(), nn.Linear(64 * 10, self.EMBED_DIM), nn.ReLU()
+        )
 
     def forward(self, mel: torch.Tensor) -> torch.Tensor:
         return self.trunk(self.features(mel))

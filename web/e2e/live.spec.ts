@@ -56,7 +56,14 @@ async function fakeMidi(page: Page, dump: number[]): Promise<void> {
       outputs: new Map([
         [
           'o',
-          { name: 'minilogue xd SOUND', send: () => listener?.(evt(bytes)) },
+          {
+            name: 'minilogue xd SOUND',
+            // A real synth answers a dump request once (on its global channel),
+            // not once per broadcast channel — reply only for channel 0.
+            send: (d: number[]) => {
+              if (d[2] === 0x30) listener?.(evt(bytes))
+            },
+          },
         ],
       ]),
       onstatechange: null,
@@ -124,4 +131,24 @@ test('detects a synth, pulls its program, and mirrors a live CC', async ({
       document.documentElement.style.getPropertyValue('--xd-knob-teal'),
     ),
   ).toBe('#ff0000')
+
+  // Clicking an effect in the FX status selects it (so TIME/DEPTH follow it).
+  const fxActive = (fx: string) =>
+    page
+      .locator('xd-fx-status')
+      .evaluate(
+        (el, f) =>
+          el.shadowRoot
+            ?.querySelector(`.fx[data-section="${f}"]`)
+            ?.classList.contains('active') ?? false,
+        fx,
+      )
+  await page
+    .locator('xd-fx-status')
+    .evaluate((el) =>
+      (
+        el.shadowRoot?.querySelector('.fx[data-section="delay"]') as HTMLElement
+      )?.click(),
+    )
+  await expect.poll(() => fxActive('delay')).toBe(true)
 })

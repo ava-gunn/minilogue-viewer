@@ -61,7 +61,7 @@ export const MinilogueXDPatchSchema = z.object({
     int: bipolar,
     target: z.enum(['PITCH', 'SHAPE', 'CUTOFF']),
   }),
-  modFx: z.object({ on: z.boolean() }),
+  modFx: z.object({ on: z.boolean(), time: norm, depth: norm }),
   delay: z.object({ on: z.boolean(), time: norm, depth: norm }),
   reverb: z.object({ on: z.boolean(), time: norm, depth: norm }),
 }) satisfies z.ZodType<MinilogueXDPatch>

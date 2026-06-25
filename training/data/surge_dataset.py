@@ -17,6 +17,24 @@ from torch.utils.data import Dataset
 from training import schema
 from training.data import mel as melmod
 
+# Surge params that shape a single sustained C4 note — the focused pretrain target. (At a
+# fixed pitch, keytrack barely manifests; it's kept per the chosen set but the per-param
+# breakdown will reveal it as near-unlearnable.)
+FOCUSED_TARGETS = [
+    "a_filter_1_cutoff",
+    "a_filter_1_resonance",
+    "a_filter_1_keytrack",
+    "a_amp_eg_attack",
+    "a_amp_eg_decay",
+    "a_amp_eg_sustain",
+    "a_amp_eg_release",
+    "a_filter_eg_attack",
+    "a_filter_eg_decay",
+    "a_filter_eg_sustain",
+    "a_filter_eg_release",
+    "a_osc_1_shape",
+]
+
 
 def _read_wav(path: Path) -> np.ndarray:
     with wave.open(str(path), "rb") as w:
@@ -42,11 +60,18 @@ def _ensure_mels(root: Path, sample_ids: list[int]) -> np.ndarray:
 
 
 class SurgeDataset(Dataset):
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, target_names: list[str] | None = None) -> None:
         meta = json.loads((root / "meta.json").read_text())
-        self.param_names: list[str] = meta["param_names"]
+        all_names: list[str] = meta["param_names"]
         samples = [json.loads(line) for line in (root / "samples.jsonl").open()]
-        self.targets = np.array([s["params"] for s in samples], dtype=np.float32)
+        full = np.array([s["params"] for s in samples], dtype=np.float32)
+        if target_names is None:
+            self.param_names = all_names
+            self.targets = full
+        else:
+            cols = [all_names.index(n) for n in target_names]
+            self.param_names = list(target_names)
+            self.targets = full[:, cols]
         self.mels = _ensure_mels(root, [s["id"] for s in samples])
 
     @property

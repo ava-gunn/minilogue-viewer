@@ -1,6 +1,7 @@
 import { emit, on } from './events/bus'
 import { matchAudioFile } from './inference'
 import { parseArchive } from './parser'
+import { initEffects } from './sections/effects'
 import { initShared } from './sections/shared'
 import { createLivePatch } from './services/live-patch'
 import { connectMidi } from './services/midi'
@@ -12,6 +13,7 @@ export function initApp(): void {
   initAudio()
   initLibrary()
   initShared()
+  initEffects()
   initLive()
   initColorControls()
 }
@@ -120,6 +122,7 @@ function initLive(): void {
   void (async () => {
     const midi = await connectMidi({
       onDump: live.loadDump,
+      onPoll: live.pollDump,
       onControlChange: live.controlChange,
     })
     const btn = document.getElementById('midi-refresh')

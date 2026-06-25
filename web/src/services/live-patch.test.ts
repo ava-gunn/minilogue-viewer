@@ -89,6 +89,16 @@ describe('createLivePatch', () => {
     expect(last('multi', 'typeValue')?.display).toBe('CREEP')
   })
 
+  it('pollDump refreshes only voice mode on the live layer', () => {
+    const live = createLivePatch()
+    live.loadDump(progBin)
+    changes.length = 0
+    live.pollDump(progBin)
+    expect(changes).toHaveLength(1)
+    expect(changes[0]?.section).toBe('voice')
+    expect(changes[0]?.key).toBe('mode')
+  })
+
   it('mirrors voice mode type via CC#52', () => {
     const live = createLivePatch()
     live.loadDump(progBin)

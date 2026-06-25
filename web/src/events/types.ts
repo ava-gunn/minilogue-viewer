@@ -40,6 +40,10 @@ export interface AppEventMap {
     device?: string
     detail?: string
   }
+  /** User picked which effect slot the TIME/DEPTH knobs show. */
+  'fx:select': { effect: string }
+  /** The effect slot now driving TIME/DEPTH (from a click or a live edit). */
+  'fx:active': { effect: string }
 }
 
 export type AppEvent = keyof AppEventMap

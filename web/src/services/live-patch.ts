@@ -226,6 +226,34 @@ const CC_TABLE: Record<number, CcSpec> = {
       r.reverbDepth = tenBit(m, l)
     },
   },
+  28: {
+    section: 'modFx',
+    key: 'time',
+    apply: (r, m, l) => {
+      r.modFxTime = tenBit(m, l)
+    },
+  },
+  29: {
+    section: 'modFx',
+    key: 'depth',
+    apply: (r, m, l) => {
+      r.modFxDepth = tenBit(m, l)
+    },
+  },
+  105: {
+    section: 'delay',
+    key: 'time',
+    apply: (r, m, l) => {
+      r.delayTime = tenBit(m, l)
+    },
+  },
+  106: {
+    section: 'delay',
+    key: 'depth',
+    apply: (r, m, l) => {
+      r.delayDepth = tenBit(m, l)
+    },
+  },
 
   // 7-bit continuous (no LSB companion)
   5: {
@@ -377,6 +405,8 @@ export interface LivePatch {
   loadDump: (prog: Uint8Array, seedLive?: boolean) => void
   /** Apply one incoming Control Change; updates the live layer for one control. */
   controlChange: (cc: number, value: number) => void
+  /** Periodic poll: refresh the live layer for params with no CC (voice mode). */
+  pollDump: (prog: Uint8Array) => void
   hasSnapshot: () => boolean
 }
 
@@ -430,5 +460,14 @@ export function createLivePatch(): LivePatch {
     }
   }
 
-  return { loadDump, controlChange, hasSnapshot: () => raw !== null }
+  // Refresh only params the synth never sends as CC (voice mode) from a poll
+  // dump, so they track the hardware without disturbing CC-driven needles.
+  function pollDump(prog: Uint8Array): void {
+    const patch = parsePatch(readRawPatch(prog))
+    for (const d of PARAMS) {
+      if (d.section === 'voice' && d.key === 'mode') emitLive(d, patch)
+    }
+  }
+
+  return { loadDump, controlChange, pollDump, hasSnapshot: () => raw !== null }
 }

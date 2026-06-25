@@ -30,6 +30,9 @@ from training import schema
 
 C4 = 60
 RMS_FLOOR = 1e-3  # discard renders quieter than this (e.g. amp EG decayed to silence)
+# Gate the note off well before the render ends so the amp/filter envelope — including
+# the release tail — is captured in the audio (not just a held sustain).
+NOTE_GATE_S = 0.6
 
 # Structural params fixed to the XD's architecture (set once per render, not randomized).
 _FIXED = {
@@ -94,7 +97,7 @@ def matched_params(instrument) -> list[str]:
 def _render_c4(instrument, duration: float, sr: int) -> np.ndarray:
     midi = [
         mido.Message("note_on", note=C4, velocity=100, time=0.0),
-        mido.Message("note_off", note=C4, time=duration),
+        mido.Message("note_off", note=C4, time=min(NOTE_GATE_S, duration)),
     ]
     stereo = instrument(midi, duration=duration, sample_rate=sr)  # (2, N) float32
     return stereo.mean(axis=0)

@@ -14,6 +14,9 @@ export interface MidiHandlers {
   /** Decoded 1024-byte prog_bin from a current-program dump. seedLive is false
       when the dump was triggered by a program change (live needles stay put). */
   onDump: (prog: Uint8Array, seedLive: boolean) => void
+  /** A periodic poll dump — refresh only params the synth doesn't send as CC
+      (e.g. voice mode), without disturbing the CC-tracked needles. */
+  onPoll: (prog: Uint8Array) => void
   /** A Control Change (controller, value), each 0..127. */
   onControlChange: (controller: number, value: number) => void
 }
@@ -63,9 +66,10 @@ export async function connectMidi(
   }
 
   let refreshTimer: ReturnType<typeof setTimeout> | undefined
-  // Whether the next dump should also reset the live layer. True for connect /
-  // manual refresh; set false by a program change.
-  let pendingSeedLive = true
+  // What the next dump response is for: 'full' = connect/refresh (seed live too),
+  // 'program' = program change (leave live needles), 'poll' = periodic SysEx-only
+  // refresh (voice mode etc.).
+  let pendingMode: 'full' | 'program' | 'poll' = 'full'
 
   function deviceName(): string | undefined {
     const ports = [...access.inputs.values(), ...access.outputs.values()]
@@ -87,7 +91,7 @@ export async function connectMidi(
   }
 
   function refresh(seedLive = true): void {
-    pendingSeedLive = seedLive
+    pendingMode = seedLive ? 'full' : 'program'
     if (refreshTimer) clearTimeout(refreshTimer)
     refreshTimer = setTimeout(sendRequest, 120)
   }
@@ -98,9 +102,11 @@ export async function connectMidi(
     if (data[0] === 0xf0) {
       if (isCurrentProgramDump(data)) {
         try {
-          const seedLive = pendingSeedLive
-          pendingSeedLive = true
-          handlers.onDump(decodeCurrentProgramDump(data), seedLive)
+          const mode = pendingMode
+          pendingMode = 'full'
+          const prog = decodeCurrentProgramDump(data)
+          if (mode === 'poll') handlers.onPoll(prog)
+          else handlers.onDump(prog, mode === 'full')
         } catch (err) {
           emit('file:error', {
             message: `Bad program dump: ${err instanceof Error ? err.message : String(err)}`,
@@ -140,6 +146,13 @@ export async function connectMidi(
   attachInputs()
   updateStatus()
   refresh()
+
+  // Poll the current program so SysEx-only params (voice mode) track the synth,
+  // which doesn't transmit them as CC. No-ops when no device is connected.
+  setInterval(() => {
+    pendingMode = 'poll'
+    sendRequest()
+  }, 1500)
 
   return { refresh }
 }

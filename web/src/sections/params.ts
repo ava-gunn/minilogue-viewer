@@ -217,7 +217,13 @@ export const PARAMS: ParamDescriptor[] = [
     display: (p) => p.lfo.target,
   },
 
-  // EFFECTS (panel TIME/DEPTH show the reverb slot)
+  // EFFECTS — per-slot time/depth. Consumed by the effects-focus controller
+  // (sections/effects.ts), which multiplexes the selected slot onto the panel's
+  // TIME/DEPTH knobs (section "fx"). No control binds to these directly.
+  knob('modFx', 'time', (p) => p.modFx.time),
+  knob('modFx', 'depth', (p) => p.modFx.depth),
+  knob('delay', 'time', (p) => p.delay.time),
+  knob('delay', 'depth', (p) => p.delay.depth),
   knob('reverb', 'time', (p) => p.reverb.time),
   knob('reverb', 'depth', (p) => p.reverb.depth),
   // Effect on/off (1 = on) — drives the FX status lights + the ON/OFF toggle.

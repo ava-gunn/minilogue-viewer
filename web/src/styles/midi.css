@@ -59,6 +59,7 @@
   display: inline-flex;
   gap: var(--wa-space-m, 1rem);
   margin-inline-start: auto;
+  padding-inline-end: var(--wa-space-l, 1.5rem);
   font-size: 0.78rem;
   color: var(--wa-color-text-quiet, #8a8a93);
 }

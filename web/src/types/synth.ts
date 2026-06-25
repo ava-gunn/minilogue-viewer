@@ -109,7 +109,7 @@ export interface MinilogueXDPatch {
   ampEnv: AmpEgParams
   filterEnv: FilterEgParams
   lfo: LfoParams
-  modFx: { on: boolean }
+  modFx: FxSlot
   delay: FxSlot
   reverb: FxSlot
 }

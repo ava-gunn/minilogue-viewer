@@ -1,4 +1,4 @@
-import { on } from '../events/bus'
+import { emit, on } from '../events/bus'
 import { adoptStyles, define } from './util'
 
 // The three effect slots, top → bottom (matches the hardware's MOD/REV/DEL).
@@ -16,7 +16,18 @@ const styles = `
     gap: 0.15rem;
     font-family: var(--xd-font);
   }
-  .fx { display: flex; align-items: center; gap: 0.3rem; }
+
+  .fx {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    cursor: pointer;
+    /* transparent bar reserves space so selecting one doesn't shift layout */
+    border-inline-start: 2px solid transparent;
+    padding-inline-start: 0.25rem;
+  }
+  .fx:hover .label { color: var(--xd-label-bright, #c4c4cc); }
+  .fx.active { border-inline-start-color: var(--wa-color-text-normal, #e0e0e6); }
 
   .dot {
     inline-size: 0.45rem;
@@ -62,6 +73,7 @@ class XdFxStatus extends HTMLElement {
       on('param:live', ({ section, key, value }) => {
         if (key === 'on') this.#set(section, 'live', value > 0)
       }),
+      on('fx:active', ({ effect }) => this.#setActive(effect)),
     )
   }
 
@@ -74,15 +86,35 @@ class XdFxStatus extends HTMLElement {
     adoptStyles(this.#shadow, styles)
     this.#shadow.innerHTML = EFFECTS.map(
       ({ label, section }) =>
-        `<div class="fx" data-section="${section}" part="fx"><span class="dot" part="dot"></span><span class="label">${label}</span></div>`,
+        `<div class="fx" data-section="${section}" part="fx" role="button" tabindex="0"><span class="dot" part="dot"></span><span class="label">${label}</span></div>`,
     ).join('')
-    this.setAttribute('role', 'img')
-    this.setAttribute('aria-label', 'Effects on/off')
+    this.setAttribute('role', 'group')
+    this.setAttribute('aria-label', 'Effects — click to inspect')
+
+    for (const row of this.#shadow.querySelectorAll<HTMLElement>('.fx')) {
+      const select = (): void => {
+        const effect = row.dataset.section
+        if (effect) emit('fx:select', { effect })
+      }
+      row.addEventListener('click', select)
+      row.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          select()
+        }
+      })
+    }
   }
 
   #set(section: string, layer: 'prog' | 'live', active: boolean): void {
     const row = this.#shadow.querySelector(`.fx[data-section="${section}"]`)
     row?.classList.toggle(layer, active)
+  }
+
+  #setActive(effect: string): void {
+    for (const row of this.#shadow.querySelectorAll<HTMLElement>('.fx')) {
+      row.classList.toggle('active', row.dataset.section === effect)
+    }
   }
 }
 

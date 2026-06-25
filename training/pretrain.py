@@ -17,7 +17,7 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, random_split
 
-from training.data.surge_dataset import SurgeDataset
+from training.data.surge_dataset import FOCUSED_TARGETS, SurgeDataset
 from training.model.encoder import SurgePretrainModel
 
 _REPO = Path(__file__).resolve().parent.parent
@@ -48,6 +48,18 @@ def _epoch(model, loader, device, opt=None) -> float:
     return total / max(batches, 1)
 
 
+def _per_param_l1(model, loader, device, names: list[str]) -> list[tuple[str, float]]:
+    model.eval()
+    err = torch.zeros(len(names))
+    count = 0
+    with torch.no_grad():
+        for mel, target in loader:
+            pred = model(mel.to(device)).cpu()
+            err += (pred - target).abs().sum(0)
+            count += target.shape[0]
+    return sorted(zip(names, (err / count).tolist()), key=lambda kv: kv[1])
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--data", type=Path, required=True)
@@ -55,6 +67,7 @@ def main() -> None:
     ap.add_argument("--batch-size", type=int, default=64)
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--val-frac", type=float, default=0.1)
+    ap.add_argument("--targets", choices=["focused", "all"], default="focused")
     ap.add_argument("--device", default=None)
     ap.add_argument(
         "--out", type=Path, default=_REPO / "training" / "checkpoints" / "backbone.pt"
@@ -62,7 +75,8 @@ def main() -> None:
     args = ap.parse_args()
 
     device = _pick_device(args.device)
-    dataset = SurgeDataset(args.data)
+    target_names = None if args.targets == "all" else FOCUSED_TARGETS
+    dataset = SurgeDataset(args.data, target_names=target_names)
     n_val = int(len(dataset) * args.val_frac)
     n_train = len(dataset) - n_val
     train_ds, val_ds = random_split(
@@ -88,6 +102,9 @@ def main() -> None:
         print(f"epoch {epoch:3d}/{args.epochs}  train_l1 {train_l1:.4f}  val_l1 {val_l1:.4f}{flag}")
 
     print(f"best val_l1 {best:.4f}  backbone -> {args.out}")
+    print("per-param val L1 (low = learnable from audio):")
+    for name, l1 in _per_param_l1(model, val_dl, device, dataset.param_names):
+        print(f"  {l1:.4f}  {name}")
 
 
 if __name__ == "__main__":
