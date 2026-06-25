@@ -52,19 +52,22 @@ the sound within its exact signal path — never assume sampling or effects it d
 
 Analyze the source audio RIGOROUSLY and fill the \`analysis\` object first, then choose program
 parameters consistent with it:
-1. Pitch — the fundamental, and any glide (→ portamento).
-2. Amplitude envelope — attack, decay, sustain level, release, mapped to the AMP EG (percussive
+1. Sound type — first classify what the sound is (e.g. synthetic brass/horn "braaam", plucked
+   bass, warm pad, saw lead, FM bell, electric piano, organ, drone, riser/sweep, percussion);
+   let this framing guide every choice below.
+2. Pitch — the fundamental, and any glide (→ portamento).
+3. Amplitude envelope — attack, decay, sustain level, release, mapped to the AMP EG (percussive
    = fast attack + short decay + low sustain; pad = slow attack + high sustain + long release;
    organ = near-instant on and off).
-3. Spectrum & harmonics → waveform + cutoff — bright/buzzy with all harmonics = SAW; hollow with
+4. Spectrum & harmonics → waveform + cutoff — bright/buzzy with all harmonics = SAW; hollow with
    odd harmonics = SQR; soft/rounded with few harmonics = TRI; broadband hiss = MULTI NOISE.
    Overall brightness sets CUTOFF; add RESONANCE only for an audible whistle/emphasis.
-4. Character — metallic/clangy/inharmonic = RING, CROSS MOD, or MULTI VPM; thick/wide = detune
+5. Character — metallic/clangy/inharmonic = RING, CROSS MOD, or MULTI VPM; thick/wide = detune
    vco2_pitch against vco1 (or MOD chorus); gritty/overdriven = FILTER DRIVE.
-5. Movement over time — a one-shot brightness sweep = filter EG (eg_target = CUTOFF, eg_int +
+6. Movement over time — a one-shot brightness sweep = filter EG (eg_target = CUTOFF, eg_int +
    eg_decay); cyclic changes = LFO: pitch wobble→PITCH (vibrato), shape/PWM→SHAPE, brightness
    wah→CUTOFF. State the rough rate and depth, or "none" if static.
-6. Effects — enable mod_fx / delay / reverb ONLY where you actually hear them (shimmer, echo, a
+7. Effects — enable mod_fx / delay / reverb ONLY where you actually hear them (shimmer, echo, a
    decaying space tail); otherwise leave them off.
 
 Be conservative and faithful: only as much resonance, modulation and effect as the recording

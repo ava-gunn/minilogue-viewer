@@ -92,6 +92,8 @@ export const PARAM_GLOSSARY: Record<string, string> = {
 // onto a section of the minilogue xd, so the analysis and the resulting program stay consistent
 // (and we get the rigorous, Korg-relevant breakdown back for training/eval).
 export const ANALYSIS_FIELDS: Record<string, string> = {
+  sound_type:
+    'what kind of sound this is — name the instrument/category, e.g. "synthetic brass/horn (braaam)", "plucked bass", "warm pad", "saw lead", "FM bell", "electric piano", "organ", "noise sweep/riser", "percussion"',
   pitch: 'fundamental pitch / note you hear, and any glide between notes (→ portamento)',
   dynamics:
     'amplitude envelope across the note: attack, decay, sustain level, release (→ AMP EG); e.g. "instant attack, no sustain, short release — plucky"',

@@ -23,6 +23,7 @@ import {
 import { analyzeAudio, MODELS } from '../services/gemini'
 import { createLivePatch } from '../services/live-patch'
 import { connectMidi, type MidiController } from '../services/midi'
+import { toast } from '../services/toast'
 import {
   mountTurnstile,
   resetTurnstile,
@@ -57,6 +58,7 @@ let objectUrl: string | undefined
 // Render the rationale plus Gemini's structured audio analysis (one line per heard trait) into
 // the result box; .resynth-result uses white-space: pre-line so the newlines show.
 const ANALYSIS_LABELS: Record<string, string> = {
+  sound_type: 'Type',
   pitch: 'Pitch',
   dynamics: 'Dynamics',
   brightness: 'Brightness',
@@ -327,8 +329,8 @@ export function initResynth(): void {
       updateLoad()
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      setStatus(`Error: ${message}`)
-      emit('file:error', { message })
+      setStatus('')
+      toast(message, 'danger')
     } finally {
       spinner?.setAttribute('hidden', '')
       if (generateBtn) generateBtn.disabled = false
@@ -372,8 +374,10 @@ export function initResynth(): void {
         )
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
-        setStatus(
+        setStatus('')
+        toast(
           `Local verify failed: ${message}. Is the daemon running? (pnpm daemon:start)`,
+          'danger',
         )
         if (upBtn) upBtn.disabled = false
         if (downBtn) downBtn.disabled = false
@@ -410,7 +414,8 @@ export function initResynth(): void {
       setStatus(`Thanks! Feedback sent (${id}).`)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      setStatus(`Could not send feedback: ${message}`)
+      setStatus('')
+      toast(`Could not send feedback: ${message}`, 'danger')
       if (upBtn) upBtn.disabled = false
       if (downBtn) downBtn.disabled = false
     }
