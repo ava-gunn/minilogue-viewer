@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { PARAM_SPEC } from '../parser/param-spec'
-import { buildResponseSchema, PARAM_GLOSSARY, programToRawById } from './schema'
+import {
+  ANALYSIS_FIELDS,
+  buildResponseSchema,
+  PARAM_GLOSSARY,
+  programToRawById,
+} from './schema'
 
 describe('buildResponseSchema', () => {
   const schema = buildResponseSchema()
@@ -11,6 +16,18 @@ describe('buildResponseSchema', () => {
     expect(Object.keys(program?.properties ?? {})).toEqual(ids)
     expect(program?.propertyOrdering).toEqual(ids)
     expect(program?.required).toEqual(ids)
+  })
+
+  it('includes a structured analysis object, emitted before the program', () => {
+    const analysis = schema.properties?.analysis
+    expect(analysis?.type).toBe('OBJECT')
+    expect(Object.keys(analysis?.properties ?? {})).toEqual(
+      Object.keys(ANALYSIS_FIELDS),
+    )
+    expect(analysis?.required).toEqual(Object.keys(ANALYSIS_FIELDS))
+    const order = schema.propertyOrdering ?? []
+    expect(order.indexOf('analysis')).toBeLessThan(order.indexOf('program'))
+    expect(schema.required).toContain('analysis')
   })
 
   it('types each param: continuous=NUMBER, discrete=STRING enum / INTEGER, boolean=BOOLEAN', () => {

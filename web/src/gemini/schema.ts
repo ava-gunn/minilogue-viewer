@@ -8,7 +8,7 @@ import { PARAM_SPEC } from '../parser/param-spec'
 
 // Bump when the prompt or the schema mapping changes, so submissions carry provenance and
 // stale-prompt data is filterable downstream.
-export const PROMPT_VERSION = 'gemini-resynth-v1'
+export const PROMPT_VERSION = 'gemini-resynth-v2'
 export const SCHEMA_VERSION = 'xd-params-52-v1'
 
 /** Minimal JSON-schema subset accepted by @google/genai's responseSchema. */
@@ -88,6 +88,23 @@ export const PARAM_GLOSSARY: Record<string, string> = {
   reverb_depth: 'reverb wet depth',
 }
 
+// What Gemini must determine from the source audio before choosing parameters. Each field maps
+// onto a section of the minilogue xd, so the analysis and the resulting program stay consistent
+// (and we get the rigorous, Korg-relevant breakdown back for training/eval).
+export const ANALYSIS_FIELDS: Record<string, string> = {
+  pitch: 'fundamental pitch / note you hear, and any glide between notes (→ portamento)',
+  dynamics:
+    'amplitude envelope across the note: attack, decay, sustain level, release (→ AMP EG); e.g. "instant attack, no sustain, short release — plucky"',
+  brightness:
+    'overall spectral brightness and whether it stays steady, opens, or closes over the note (→ CUTOFF, plus a filter EG sweep if it moves)',
+  harmonics:
+    'harmonic content and the waveform(s) it implies: buzzy/all-harmonics=SAW, hollow/odd=SQR, soft/few=TRI, broadband hiss=MULTI NOISE, metallic/inharmonic=RING·CROSS-MOD·VPM',
+  movement:
+    'periodic modulation and its rough rate/depth: vibrato (LFO→PITCH), tremolo or PWM (LFO→SHAPE), wah (LFO→CUTOFF); "none" if static',
+  effects:
+    'audible effects only: chorus/ensemble (MOD), echo (DELAY), room/space tail (REVERB); "dry" if none',
+}
+
 function paramSchema(id: string): GeminiSchema {
   const p = PARAM_SPEC.find((s) => s.id === id)
   if (!p) throw new Error(`unknown param ${id}`)
@@ -107,8 +124,9 @@ function paramSchema(id: string): GeminiSchema {
   }
 }
 
-/** The responseSchema handed to Gemini: a `program` object (one property per param id in
- *  spec order) plus a short name and rationale for the UI. */
+/** The responseSchema handed to Gemini: a structured `analysis` of the source audio (emitted
+ *  first so it conditions the parameter choices), the `program` (one property per param id in
+ *  spec order), and a short name + rationale for the UI. */
 export function buildResponseSchema(): GeminiSchema {
   const properties: Record<string, GeminiSchema> = {}
   const ordering: string[] = []
@@ -116,13 +134,24 @@ export function buildResponseSchema(): GeminiSchema {
     properties[p.id] = paramSchema(p.id)
     ordering.push(p.id)
   }
+
+  const analysisProps: Record<string, GeminiSchema> = {}
+  const analysisOrder: string[] = []
+  for (const [id, description] of Object.entries(ANALYSIS_FIELDS)) {
+    analysisProps[id] = { type: 'STRING', description }
+    analysisOrder.push(id)
+  }
+
   return {
     type: 'OBJECT',
     properties: {
-      name: { type: 'STRING', description: 'short patch name, <= 12 chars' },
-      rationale: {
-        type: 'STRING',
-        description: 'one or two sentences on the sound design choices',
+      analysis: {
+        type: 'OBJECT',
+        description:
+          'rigorous analysis of the SOURCE audio — fill this first, then choose program params consistent with it',
+        properties: analysisProps,
+        propertyOrdering: analysisOrder,
+        required: analysisOrder,
       },
       program: {
         type: 'OBJECT',
@@ -130,9 +159,16 @@ export function buildResponseSchema(): GeminiSchema {
         propertyOrdering: ordering,
         required: ordering,
       },
+      name: { type: 'STRING', description: 'short patch name, <= 12 chars' },
+      rationale: {
+        type: 'STRING',
+        description:
+          'one or two sentences mapping the analysis to the chosen minilogue xd parameters',
+      },
     },
-    propertyOrdering: ['name', 'rationale', 'program'],
-    required: ['program'],
+    // analysis -> program -> name -> rationale: analyse first, then build, then summarise.
+    propertyOrdering: ['analysis', 'program', 'name', 'rationale'],
+    required: ['analysis', 'program'],
   }
 }
 

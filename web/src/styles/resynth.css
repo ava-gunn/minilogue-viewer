@@ -342,6 +342,10 @@
   background: var(--xd-group-bg, #18181c);
   font-size: 0.82rem;
   line-height: 1.5;
+  white-space: pre-line; /* render the \n between rationale and the analysis lines */
+}
+.resynth-result:empty {
+  display: none;
 }
 
 .resynth-feedback-row {

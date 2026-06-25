@@ -50,7 +50,34 @@ const fmtTime = (s: number): string => {
 let file: File | undefined
 let rawById: Record<string, number> | undefined
 let patchName: string | undefined
+let lastRationale: string | undefined
+let lastAnalysis: Record<string, string> | undefined
 let objectUrl: string | undefined
+
+// Render the rationale plus Gemini's structured audio analysis (one line per heard trait) into
+// the result box; .resynth-result uses white-space: pre-line so the newlines show.
+const ANALYSIS_LABELS: Record<string, string> = {
+  pitch: 'Pitch',
+  dynamics: 'Dynamics',
+  brightness: 'Brightness',
+  harmonics: 'Harmonics',
+  movement: 'Movement',
+  effects: 'Effects',
+}
+function formatResult(
+  rationale: string | undefined,
+  analysis: Record<string, string> | undefined,
+): string {
+  const blocks: string[] = []
+  if (rationale) blocks.push(rationale)
+  if (analysis) {
+    const lines = Object.entries(analysis)
+      .filter(([, v]) => typeof v === 'string' && v.trim())
+      .map(([k, v]) => `${ANALYSIS_LABELS[k] ?? k}: ${v}`)
+    if (lines.length) blocks.push(lines.join('\n'))
+  }
+  return blocks.join('\n\n')
+}
 
 export function initResynth(): void {
   const stepEls = Array.from(
@@ -264,6 +291,7 @@ export function initResynth(): void {
     try {
       let name: string | undefined
       let rationale: string | undefined
+      let analysis: Record<string, string> | undefined
       if (eng === 'gemini') {
         const program = await analyzeAudio(f, {
           apiKey: getApiKey(),
@@ -272,11 +300,14 @@ export function initResynth(): void {
         rawById = program.rawById
         name = program.name
         rationale = program.rationale
+        analysis = program.analysis
       } else {
         rawById = await matchAudioRawById(f)
         name = 'AI MATCH'
       }
       patchName = name
+      lastRationale = rationale
+      lastAnalysis = analysis
       emit('patch:load', {
         patch: rawByIdToPatch(rawById, name ?? 'AI MATCH'),
         index: 0,
@@ -284,7 +315,7 @@ export function initResynth(): void {
       })
       if (result) {
         result.textContent =
-          rationale ??
+          formatResult(rationale, analysis) ||
           'Patch loaded — try it on your minilogue xd, then rate it.'
       }
       feedback?.removeAttribute('hidden')
@@ -367,6 +398,8 @@ export function initResynth(): void {
         model: getModel(),
         engine: engine(),
         rating,
+        analysis: lastAnalysis,
+        rationale: lastRationale,
         turnstileToken: tsToken,
       })
       resetTurnstile()

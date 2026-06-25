@@ -15,6 +15,9 @@ export interface ContributionInput {
   model: string
   engine: Engine
   rating: Rating
+  /** Gemini's structured audio analysis + rationale (absent for the built-in engine). */
+  analysis?: Record<string, string> | undefined
+  rationale?: string | undefined
   turnstileToken?: string | undefined
 }
 
@@ -32,6 +35,8 @@ export async function submitContribution(
       model: input.model,
       engine: input.engine,
       rating: input.rating,
+      analysis: input.analysis,
+      rationale: input.rationale,
       promptVersion: PROMPT_VERSION,
       schemaVersion: SCHEMA_VERSION,
     }),

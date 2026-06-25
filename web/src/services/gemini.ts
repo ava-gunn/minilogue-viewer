@@ -16,6 +16,9 @@ export interface GeminiProgram {
   rawById: Record<string, number>
   name?: string | undefined
   rationale?: string | undefined
+  /** Structured analysis of the source audio (pitch, dynamics, brightness, …) — shown to the
+   *  user and uploaded with the contribution. */
+  analysis?: Record<string, string> | undefined
 }
 
 export const DEFAULT_MODEL = 'gemini-3.1-pro-preview'
@@ -32,13 +35,43 @@ export const MODELS = [
 // Inline base64 keeps it simple; larger clips would need the Files API (follow-up).
 const MAX_BYTES = 18 * 1024 * 1024
 
-const SYSTEM_INSTRUCTION =
-  'You are an expert sound designer for the Korg minilogue xd, a 2-VCO + multi-engine ' +
-  'analog/digital subtractive synthesizer. Given a recording of a single sustained ' +
-  'note or sound, estimate the program (patch) parameters that would best reproduce it ' +
-  'on the minilogue xd. Reason about oscillators, mix, filter, envelopes, LFO and ' +
-  'effects from the timbre, brightness, attack/release and movement you hear. Return ' +
-  'ONLY JSON matching the provided schema; assume POLY voice mode (a single held note).'
+const SYSTEM_INSTRUCTION = `You are an expert sound designer and audio analyst for the Korg minilogue xd.
+
+The minilogue xd is a subtractive synth, so reproduce the CLOSEST achievable approximation of
+the sound within its exact signal path — never assume sampling or effects it doesn't have:
+- Two analog oscillators VCO1 and VCO2 (each SQR / TRI / SAW, with a SHAPE/PWM control and an
+  octave foot 16'/8'/4'/2'), plus one MULTI ENGINE: NOISE (broadband), VPM (2-operator FM-style
+  digital — metallic/bell/e-piano), or USER.
+- A MIXER blends VCO1, VCO2 and MULTI; set a source's level to 0 when the sound doesn't use it.
+- ONE 2-pole (12 dB/oct, gentle) low-pass filter: CUTOFF, RESONANCE (self-oscillates when high),
+  DRIVE, KEY TRACK.
+- An AMP shaped by the AMP EG (attack / decay / sustain / release).
+- ONE assignable EG (eg_target = CUTOFF, PITCH, or PITCH2; eg_int is bipolar, 0.5 = no effect)
+  and ONE LFO (lfo_target = PITCH, SHAPE, or CUTOFF; lfo_mode BPM/NORMAL/1-SHOT).
+- Effects: MOD (chorus/ensemble/phaser/flanger), DELAY, REVERB.
+
+Analyze the source audio RIGOROUSLY and fill the \`analysis\` object first, then choose program
+parameters consistent with it:
+1. Pitch — the fundamental, and any glide (→ portamento).
+2. Amplitude envelope — attack, decay, sustain level, release, mapped to the AMP EG (percussive
+   = fast attack + short decay + low sustain; pad = slow attack + high sustain + long release;
+   organ = near-instant on and off).
+3. Spectrum & harmonics → waveform + cutoff — bright/buzzy with all harmonics = SAW; hollow with
+   odd harmonics = SQR; soft/rounded with few harmonics = TRI; broadband hiss = MULTI NOISE.
+   Overall brightness sets CUTOFF; add RESONANCE only for an audible whistle/emphasis.
+4. Character — metallic/clangy/inharmonic = RING, CROSS MOD, or MULTI VPM; thick/wide = detune
+   vco2_pitch against vco1 (or MOD chorus); gritty/overdriven = FILTER DRIVE.
+5. Movement over time — a one-shot brightness sweep = filter EG (eg_target = CUTOFF, eg_int +
+   eg_decay); cyclic changes = LFO: pitch wobble→PITCH (vibrato), shape/PWM→SHAPE, brightness
+   wah→CUTOFF. State the rough rate and depth, or "none" if static.
+6. Effects — enable mod_fx / delay / reverb ONLY where you actually hear them (shimmer, echo, a
+   decaying space tail); otherwise leave them off.
+
+Be conservative and faithful: only as much resonance, modulation and effect as the recording
+shows; keep VCO pitches centered (0.5) unless you hear detune or an interval; use a single EG
+destination (pick the dominant motion); assume POLY voice mode (one sustained held note). The
+\`rationale\` should explain your choices in minilogue xd terms. Return ONLY JSON matching the
+schema.`
 
 const AUDIO_MIME: Record<string, string> = {
   wav: 'audio/wav',
@@ -104,7 +137,9 @@ export async function analyzeAudio(
         parts: [
           {
             text:
-              'Estimate a minilogue xd program for this sound. Parameter reference ' +
+              'Analyze this recording, then estimate the minilogue xd program that best ' +
+              'reproduces it. Fill the `analysis` from what you actually hear, then set every ' +
+              'program parameter consistent with it. Parameter reference ' +
               `(schema ${SCHEMA_VERSION}, prompt ${PROMPT_VERSION}):\n${glossaryText()}`,
           },
           { inlineData: { mimeType: audioMime(file), data } },
@@ -124,10 +159,15 @@ export async function analyzeAudio(
   }
 
   const program = (parsed.program ?? parsed) as Record<string, unknown>
+  const analysis =
+    parsed.analysis && typeof parsed.analysis === 'object'
+      ? (parsed.analysis as Record<string, string>)
+      : undefined
   return {
     rawById: programToRawById(program),
     name: typeof parsed.name === 'string' ? parsed.name : undefined,
     rationale:
       typeof parsed.rationale === 'string' ? parsed.rationale : undefined,
+    analysis,
   }
 }
