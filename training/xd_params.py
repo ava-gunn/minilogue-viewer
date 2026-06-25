@@ -60,6 +60,27 @@ def _targets(raw_by_id: dict[str, int]) -> dict:
     }
 
 
+def clamp_params(raw_by_id: dict[str, int]) -> dict[str, int]:
+    """Clamp untrusted raw values to each param's schema range (continuous -> [0,raw_max],
+    discrete -> [0,cardinality), boolean -> {0,1}) and pin voice_mode to POLY. Used before
+    realizing a *submitted* patch on hardware so an out-of-range or ARP/high-resonance patch
+    can't be driven onto the synth."""
+    out: dict[str, int] = {}
+    for p in schema.PARAMS:
+        if p["id"] not in raw_by_id:
+            continue
+        v = int(raw_by_id[p["id"]])
+        if p["type"] == "continuous":
+            v = max(0, min(p["raw_max"], v))
+        elif p["type"] == "discrete":
+            v = max(0, min(p["cardinality"] - 1, v))
+        else:  # boolean
+            v = 1 if v else 0
+        out[p["id"]] = v
+    out["voice_mode"] = _VOICE_MODE_POLY
+    return out
+
+
 def write_params(template: bytes, raw_by_id: dict[str, int]) -> bytes:
     """Overwrite a valid template prog_bin's param-region bytes with raw values (by param
     id), leaving structure/header/sequence intact. Inverse of the TS parser's raw

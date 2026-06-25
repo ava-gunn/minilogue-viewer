@@ -26,6 +26,7 @@ import argparse
 import json
 import os
 import tempfile
+import urllib.error
 import urllib.parse
 import urllib.request
 import wave
@@ -44,6 +45,24 @@ _PARAM_IDS = [p["id"] for p in schema.PARAMS]
 # custom blob domain). Keeps a tampered record from pointing the fetch at file:// or
 # an internal address.
 _BLOB_HOST_SUFFIX = os.environ.get("CONTRIB_BLOB_HOST_SUFFIX", ".public.blob.vercel-storage.com")
+
+
+def _blob_url_ok(url: str) -> bool:
+    parsed = urllib.parse.urlparse(url)
+    return parsed.scheme == "https" and (parsed.hostname or "").endswith(_BLOB_HOST_SUFFIX)
+
+
+class _BlobRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Re-validate every redirect hop, so a Blob URL can't 30x-redirect the fetch to an
+    internal host (the initial-URL check alone wouldn't catch that)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not _blob_url_ok(newurl):
+            raise urllib.error.HTTPError(newurl, code, "redirect to non-Blob host blocked", headers, fp)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_blob_opener = urllib.request.build_opener(_BlobRedirectHandler)
 
 
 def _write_wav(path: Path, audio: np.ndarray, sr: int) -> None:
@@ -71,10 +90,9 @@ def _decode_audio(url: str, ext: str) -> np.ndarray:
     file:// or an internal host (SSRF defense)."""
     import librosa
 
-    parsed = urllib.parse.urlparse(url)
-    if parsed.scheme != "https" or not (parsed.hostname or "").endswith(_BLOB_HOST_SUFFIX):
+    if not _blob_url_ok(url):
         raise ValueError(f"refusing non-Blob audio url: {url!r}")
-    data = urllib.request.urlopen(url, timeout=30).read()  # noqa: S310 (validated Blob URL)
+    data = _blob_opener.open(url, timeout=30).read()  # noqa: S310 (validated Blob URL + each hop)
     with tempfile.NamedTemporaryFile(suffix=f".{ext}", delete=True) as tmp:
         tmp.write(data)
         tmp.flush()

@@ -74,18 +74,21 @@ class XdDisplay extends HTMLElement {
   #build(): void {
     adoptStyles(this.#shadow, styles)
     const accept = this.getAttribute('accept') ?? DEFAULT_ACCEPT
-    this.#shadow.innerHTML = `<div class="screen" part="screen"><div class="name" part="name">INIT PROGRAM</div><div class="meta" part="meta"><span class="index"></span><span class="hint">click or drop a patch</span></div></div><input type="file" accept="${accept}" />`
+    // The file input lives inside the <label>, so a plain click opens the picker via native
+    // label activation — a programmatic input.click() is blocked in some embedded WebViews
+    // (e.g. Ableton's WKWebView). The input stays display:none so it never intercepts drops.
+    this.#shadow.innerHTML = `<label class="screen" part="screen"><div class="name" part="name">INIT PROGRAM</div><div class="meta" part="meta"><span class="index"></span><span class="hint">click or drop a patch</span></div><input type="file" accept="${accept}" /></label>`
     this.#input = this.#shadow.querySelector('input') as HTMLInputElement
     this.setAttribute('role', 'button')
     if (!this.hasAttribute('tabindex')) this.setAttribute('tabindex', '0')
     this.#updateAria('INIT PROGRAM')
 
-    const open = (): void => this.#input.click()
-    this.#shadow.querySelector('.screen')?.addEventListener('click', open)
+    // Mouse: the native <label> opens the picker. Keyboard: fall back to a click() (the host
+    // is role=button/tabindex=0), which works in regular browsers.
     this.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault()
-        open()
+        this.#input.click()
       }
     })
     this.#input.addEventListener('change', () => {

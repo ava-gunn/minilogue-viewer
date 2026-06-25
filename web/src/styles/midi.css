@@ -86,6 +86,10 @@
   font-size: 0.78rem;
   color: var(--wa-color-text-quiet, #8a8a93);
 }
+/* Outrank the display rule above so the hidden attribute (no synth connected) wins. */
+.midi-legend[hidden] {
+  display: none;
+}
 .swatch-label {
   display: inline-flex;
   align-items: center;

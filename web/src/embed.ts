@@ -13,7 +13,7 @@ import { mountPanel } from './panel'
 import { initEffects } from './sections/effects'
 import { initLibrary, initLoad } from './sections/load'
 import { initShared } from './sections/shared'
-import { initEmbedLink } from './services/host-bridge'
+import { initEmbed } from './services/host-bridge'
 
 // Viewer-only build for the Ableton extension: the shared Korg panel + patch-file loading,
 // with NO inference (ONNX) and NO Web MIDI (unavailable in the embedded WebView). The
@@ -23,11 +23,12 @@ initShared()
 initEffects()
 initLoad()
 initLibrary()
-initEmbedLink()
+initEmbed()
 
 // Audio matching / re-synthesis is browser-only; guide the user there if they pick audio.
 on('audio:dropped', () =>
   emit('file:error', {
-    message: 'Audio re-synthesis is available in the browser — use Resynthesis.',
+    message:
+      'Audio re-synthesis is available in the browser — use Resynthesis.',
   }),
 )

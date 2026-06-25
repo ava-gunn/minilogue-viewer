@@ -7,6 +7,43 @@
   color: var(--wa-color-text-normal, #e0e0e6);
 }
 
-.midi-bar .resynth-link {
+/* Link to the full web app (opened in the system browser); pushed to the right. */
+.embed-web-link {
   margin-inline-start: auto;
+  font-size: 0.85rem;
+  padding: 0.3em 0.95em;
+  color: var(--wa-color-text-normal, #e0e0e6);
+  text-decoration: none;
+  border: 1px solid var(--xd-divider, #44444e);
+  border-radius: var(--wa-border-radius-m, 6px);
+}
+.embed-web-link:hover {
+  border-color: var(--wa-color-text-quiet, #8a8a93);
+}
+.ext-icon {
+  inline-size: 0.85em;
+  block-size: 0.85em;
+  margin-inline-start: 0.45em;
+  vertical-align: -0.1em;
+}
+
+.embed-close {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.3em 0.95em;
+  color: var(--wa-color-text-normal, #e0e0e6);
+  background: transparent;
+  border: 1px solid var(--xd-divider, #44444e);
+  border-radius: var(--wa-border-radius-m, 6px);
+  cursor: pointer;
+}
+.embed-close:hover {
+  border-color: var(--wa-color-text-quiet, #8a8a93);
+}
+
+/* In the fixed-size modal, cap the library list so it scrolls internally instead of pushing
+   the synth out of view; the window is sized to show this open (see VIEWER_HEIGHT). */
+#program-list {
+  max-height: 12rem;
+  overflow-y: auto;
 }

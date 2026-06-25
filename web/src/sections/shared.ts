@@ -25,6 +25,13 @@ function initColors(): void {
   }
   wire('color-prog', '--xd-knob-teal')
   wire('color-live', '--xd-knob-live')
+
+  // The Program/Synth legend only makes sense with a synth connected (two needle colours);
+  // reveal it only while Web MIDI reports a connection.
+  const legend = document.querySelector('.midi-legend')
+  on('midi:status', ({ state }) => {
+    legend?.toggleAttribute('hidden', state !== 'connected')
+  })
 }
 
 /** On patch load, push every parameter out to its control. */

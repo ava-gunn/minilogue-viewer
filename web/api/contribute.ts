@@ -38,9 +38,12 @@ function json(body: unknown, status: number): Response {
 }
 
 function clientIp(req: Request): string {
-  return (
-    (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() || 'unknown'
-  )
+  // x-real-ip is set by Vercel to the true client IP (not client-spoofable). Fall back to the
+  // RIGHTMOST x-forwarded-for hop (the one Vercel appended), never the client-controlled left.
+  const real = req.headers.get('x-real-ip')?.trim()
+  if (real) return real
+  const xff = (req.headers.get('x-forwarded-for') ?? '').split(',')
+  return xff[xff.length - 1]?.trim() || 'unknown'
 }
 
 /** Per-IP fixed-window limit via the Vercel KV (Upstash) REST API. Fails OPEN when KV is
@@ -48,20 +51,29 @@ function clientIp(req: Request): string {
 async function rateLimited(ip: string): Promise<boolean> {
   const url = process.env.KV_REST_API_URL
   const auth = process.env.KV_REST_API_TOKEN
-  if (!url || !auth) return false
+  if (!url || !auth) {
+    if (process.env.VERCEL_ENV === 'production') {
+      console.warn('rate limiting disabled: KV not configured')
+    }
+    return false // fail open: availability over strictness (Turnstile is the real gate)
+  }
   try {
     const key = `rl:contribute:${ip}`
-    const headers = { authorization: `Bearer ${auth}` }
-    const res = await fetch(`${url}/incr/${encodeURIComponent(key)}`, {
-      headers,
+    // One pipelined round-trip: create the key with its TTL atomically (SET .. EX .. NX),
+    // then INCR — so a crash can't leave a TTL-less (permanently-blocking) key.
+    const res = await fetch(`${url}/pipeline`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${auth}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify([
+        ['SET', key, '0', 'EX', String(RATE_WINDOW_S), 'NX'],
+        ['INCR', key],
+      ]),
     })
-    const { result } = (await res.json()) as { result: number }
-    if (result === 1) {
-      await fetch(`${url}/expire/${encodeURIComponent(key)}/${RATE_WINDOW_S}`, {
-        headers,
-      })
-    }
-    return result > RATE_LIMIT
+    const out = (await res.json()) as Array<{ result?: number }>
+    return Number(out[1]?.result ?? 0) > RATE_LIMIT
   } catch {
     return false
   }
@@ -71,7 +83,9 @@ async function rateLimited(ip: string): Promise<boolean> {
  *  production); otherwise fails CLOSED on a missing/invalid token. */
 async function turnstileOk(token: string | null, ip: string): Promise<boolean> {
   const secret = process.env.TURNSTILE_SECRET_KEY
-  if (!secret) return true
+  // Fail CLOSED in production if the secret is missing — a dropped env var must not silently
+  // disable the captcha. The skip is allowed only outside production (local/preview dev).
+  if (!secret) return process.env.VERCEL_ENV !== 'production'
   if (!token) return false
   try {
     const res = await fetch(
@@ -81,8 +95,11 @@ async function turnstileOk(token: string | null, ip: string): Promise<boolean> {
         body: new URLSearchParams({ secret, response: token, remoteip: ip }),
       },
     )
-    const data = (await res.json()) as { success?: boolean }
-    return data.success === true
+    const data = (await res.json()) as { success?: boolean; hostname?: string }
+    if (data.success !== true) return false
+    // If a hostname is pinned, reject tokens solved on another origin (token-sharing abuse).
+    const expected = process.env.TURNSTILE_HOSTNAME
+    return !expected || data.hostname === expected
   } catch {
     return false
   }

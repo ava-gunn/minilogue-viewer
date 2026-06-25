@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "pnpm -C web dev",
+    "local": "bash scripts/dev-local.sh",
     "build": "pnpm -C web build",
     "preview": "pnpm -C web preview",
     "test": "pnpm -C web test",

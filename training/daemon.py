@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hmac
 import json
 import os
 import shutil
@@ -144,6 +145,9 @@ def _verify_signal(
     """Render raw_by_id on the XD, score against source, and promote if it matches better
     than chance. Shared by the local POST handler (origin 'daemon-verified') and the remote
     Vercel poller (origin 'remote-verified'). Serialized on state.lock (one hardware op)."""
+    # Submitted params are untrusted — clamp to schema ranges + pin POLY so an out-of-range or
+    # ARP/high-resonance patch can't be driven onto the hardware.
+    raw_by_id = xd_params.clamp_params(raw_by_id)
     prog_bin = xd_params.write_params(state.template, raw_by_id)
     with state.lock:
         state.xd.send_patch(prog_bin, settle_s=state.args.settle)
@@ -214,6 +218,9 @@ def _pull_remote(state: State) -> None:
     verified = 0
     for rec in records:
         if state.stop.is_set():
+            break
+        if verified >= state.args.max_per_poll:  # bound hardware/retrain work per poll
+            print(f"[remote] per-poll cap {state.args.max_per_poll} reached; rest next poll", flush=True)
             break
         cid = rec.get("id")
         if not cid or cid in state.remote_ledger:
@@ -315,15 +322,15 @@ def _handler(state: State) -> type[BaseHTTPRequestHandler]:
                 self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Daemon-Token")
 
         def _authorized(self) -> bool:
-            """Gate side-effecting requests: reject browser requests from a foreign origin,
-            and (if a token is configured) require it. Requests with no Origin (curl, the
-            local test client) are allowed — the daemon binds to 127.0.0.1 only."""
+            """Gate side-effecting requests. If a token is configured, require it (constant-time
+            compare). Otherwise require a browser request from an allowlisted Origin — a request
+            with no Origin and no token is refused (localhost isn't an authz boundary on a
+            multi-process machine)."""
+            token = state.args.token
+            if token:
+                return hmac.compare_digest(self.headers.get("X-Daemon-Token") or "", token)
             origin = self.headers.get("Origin")
-            if origin is not None and origin not in state.args.allow_origin:
-                return False
-            if state.args.token and self.headers.get("X-Daemon-Token") != state.args.token:
-                return False
-            return True
+            return origin is not None and origin in state.args.allow_origin
 
         def _json(self, code: int, body: dict) -> None:
             data = json.dumps(body).encode()
@@ -391,6 +398,8 @@ def main() -> None:
     ap.add_argument("--contrib-token", default=os.environ.get("CONTRIB_ADMIN_TOKEN"),
                     help="admin token for /api/contributions (or CONTRIB_ADMIN_TOKEN)")
     ap.add_argument("--poll-interval", type=int, default=300, help="seconds between remote pulls")
+    ap.add_argument("--max-per-poll", type=int, default=25,
+                    help="cap hardware verifies per remote poll (bounds DoS/abuse)")
     ap.add_argument("--no-remote", action="store_true", help="disable remote polling")
     ap.add_argument(
         "--allow-origin",

@@ -4,6 +4,13 @@ import viewerHtml from "./viewer.generated.html"
 
 const VIEWER_ID = "minilogue-xd-viewer.open"
 
+// The modal is a fixed-size window (the SDK has no auto-fit / post-open resize), so we size it
+// for the tallest common layout: the synth (~408) plus an open library drawer (~700 total; the
+// program list is capped + scrolls internally — see embed.css). A single program leaves some
+// empty space below, which is unavoidable without a resize API.
+const VIEWER_WIDTH = 1300
+const VIEWER_HEIGHT = 720
+
 // Object scopes the action appears under (mirrors harmony-track). The viewer isn't tied to
 // Live data, so it's offered broadly; right-clicking any of these shows "minilogue xd viewer".
 const SCOPES = [
@@ -25,9 +32,11 @@ export function activate(activation: ActivationContext) {
       // bridge, which closes the dialog and returns here — we then open the system browser.
       const result = await context.ui.showModalDialog(
         `data:text/html,${encodeURIComponent(viewerHtml)}`,
-        1300,
-        860,
+        VIEWER_WIDTH,
+        VIEWER_HEIGHT,
       )
+      // The viewer closes the dialog via close_and_send; "open-url" also opens the browser,
+      // "close" just dismisses (nothing more to do here).
       const data = JSON.parse(result) as { action?: string; url?: string }
       if (data.action === "open-url" && typeof data.url === "string") {
         openBrowser(data.url)

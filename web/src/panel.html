@@ -121,8 +121,9 @@
 
   <footer class="xd-bottom">
     <div class="xd-brand">KORG <strong>minilogue</strong> xd</div>
-    <!-- Needle colour legend (Program / Synth) — recolours the indicators live. -->
-    <span class="midi-legend">
+    <!-- Needle colour legend (Program / Synth) — recolours the indicators live. Shown only
+         when a synth is connected over Web MIDI (initShared toggles it on midi:status). -->
+    <span class="midi-legend" hidden>
       <label class="swatch-label" title="Program needle color">
         <input type="color" id="color-prog" value="#2dd4bf" />Program
       </label>

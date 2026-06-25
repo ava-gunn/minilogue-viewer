@@ -35,6 +35,10 @@ export default defineConfig({
   // Two entry points: the file viewer (index.html) and the re-synthesis view
   // (resynth.html). cleanUrls (vercel.json) serves the latter at /resynth.
   build: {
+    // No inline modulepreload polyfill — keeps the prod HTML free of inline scripts so the
+    // strict script-src CSP (vercel.json) holds. Safe: Web MIDI already limits this app to
+    // modern Chromium, which supports modulepreload natively.
+    modulePreload: { polyfill: false },
     rollupOptions: {
       input: {
         main: resolve(root, 'index.html'),
