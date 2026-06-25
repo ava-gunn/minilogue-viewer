@@ -78,7 +78,7 @@ describe('<xd-wave-selector>', () => {
 })
 
 describe('<xd-led-group>', () => {
-  it('lights the active LED row', () => {
+  it('lights the program row, then a second row from a live value', () => {
     const el = mount('xd-led-group', {
       label: 'VOICE',
       labels: 'POLY,UNISON,CHORD,ARP',
@@ -89,8 +89,13 @@ describe('<xd-led-group>', () => {
     emit('param:change', { section: 'voice', key: 'mode', value: 2 })
 
     const rows = el.shadowRoot?.querySelectorAll('.row')
-    expect(rows?.[2]?.classList.contains('on')).toBe(true)
-    expect(rows?.[0]?.classList.contains('on')).toBe(false)
+    expect(rows?.[2]?.classList.contains('prog')).toBe(true)
+    expect(rows?.[0]?.classList.contains('prog')).toBe(false)
     expect(el.getAttribute('aria-label')).toBe('VOICE: CHORD')
+
+    // A diverging live value lights a second (amber) row.
+    emit('param:live', { section: 'voice', key: 'mode', value: 0 })
+    expect(rows?.[0]?.classList.contains('live')).toBe(true)
+    expect(el.getAttribute('aria-label')).toBe('VOICE: CHORD (synth POLY)')
   })
 })

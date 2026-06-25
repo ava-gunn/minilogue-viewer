@@ -32,15 +32,6 @@ const serveOrtRuntime = (): Plugin => ({
 
 export default defineConfig({
   server: { port: 5173, strictPort: true },
-  // Two pages: the file viewer (index.html) and the live-MIDI mirror (live.html).
-  build: {
-    rollupOptions: {
-      input: {
-        main: resolve(root, 'index.html'),
-        live: resolve(root, 'live.html'),
-      },
-    },
-  },
   // Keep ort out of dep pre-bundling so esbuild doesn't strip the @vite-ignore on its
   // runtime wasm-glue import.
   optimizeDeps: { exclude: ['onnxruntime-web', 'onnxruntime-web/wasm'] },

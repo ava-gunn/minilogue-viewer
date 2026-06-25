@@ -7,6 +7,22 @@
   </head>
   <body>
     <div id="app">
+      <header class="midi-bar">
+        <span id="midi-status" class="midi-status" data-state="requesting">
+          <span class="midi-dot"></span>
+          <span class="midi-text">Connecting to MIDI…</span>
+        </span>
+        <button id="midi-refresh" class="midi-refresh" type="button" hidden>Refresh</button>
+        <span class="midi-legend">
+          <label class="swatch-label" title="Program needle color">
+            <input type="color" id="color-prog" value="#2dd4bf" />Program
+          </label>
+          <label class="swatch-label" title="Synth needle color">
+            <input type="color" id="color-live" value="#f6a821" />Synth
+          </label>
+        </span>
+      </header>
+
       <div id="panel-root"></div>
 
       <!-- Program library drawer (.mnlgxdlib) -->

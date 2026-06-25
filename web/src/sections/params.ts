@@ -220,4 +220,23 @@ export const PARAMS: ParamDescriptor[] = [
   // EFFECTS (panel TIME/DEPTH show the reverb slot)
   knob('reverb', 'time', (p) => p.reverb.time),
   knob('reverb', 'depth', (p) => p.reverb.depth),
+  // Effect on/off (1 = on) — drives the FX status lights + the ON/OFF toggle.
+  {
+    section: 'modFx',
+    key: 'on',
+    value: (p) => (p.modFx.on ? 1 : 0),
+    display: (p) => (p.modFx.on ? 'ON' : 'OFF'),
+  },
+  {
+    section: 'delay',
+    key: 'on',
+    value: (p) => (p.delay.on ? 1 : 0),
+    display: (p) => (p.delay.on ? 'ON' : 'OFF'),
+  },
+  {
+    section: 'reverb',
+    key: 'on',
+    value: (p) => (p.reverb.on ? 1 : 0),
+    display: (p) => (p.reverb.on ? 'ON' : 'OFF'),
+  },
 ]

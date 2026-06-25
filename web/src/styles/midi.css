@@ -1,5 +1,5 @@
-/* Live-MIDI page: status bar above the shared panel. */
-.live-bar {
+/* Compact MIDI connection bar above the panel (combined viewer + live page). */
+.midi-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -9,15 +9,6 @@
   margin-inline: auto;
   padding: var(--wa-space-s, 0.5rem) var(--wa-space-l, 1.5rem);
   font-family: var(--wa-font-family-body, system-ui, sans-serif);
-}
-
-.live-back {
-  color: var(--wa-color-text-quiet, #8a8a93);
-  font-size: 0.85rem;
-  text-decoration: none;
-}
-.live-back:hover {
-  color: var(--wa-color-text-normal, #e0e0e6);
 }
 
 .midi-status {
@@ -48,7 +39,7 @@
   --midi-dot: #ff5757;
 }
 
-.live-refresh {
+.midi-refresh {
   padding: 0.3em 0.95em;
   font: inherit;
   font-size: 0.85rem;
@@ -58,16 +49,40 @@
   border-radius: var(--wa-border-radius-m, 6px);
   cursor: pointer;
 }
-.live-refresh:hover {
+.midi-refresh:hover {
   border-color: var(--wa-color-text-quiet, #8a8a93);
 }
 
-.live-hint {
-  flex-basis: 100%;
-  margin: 0;
-  font-size: 0.8rem;
+/* Legend + colour pickers for the two indicators. Clicking a swatch opens the
+   OS colour picker; the choice updates --xd-knob-teal / --xd-knob-live live. */
+.midi-legend {
+  display: inline-flex;
+  gap: var(--wa-space-m, 1rem);
+  margin-inline-start: auto;
+  font-size: 0.78rem;
   color: var(--wa-color-text-quiet, #8a8a93);
 }
-.live-hint strong {
-  color: var(--wa-color-text-normal, #e0e0e6);
+.swatch-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  cursor: pointer;
+}
+.swatch-label input[type="color"] {
+  inline-size: 0.95em;
+  block-size: 0.95em;
+  padding: 0;
+  border: 1px solid var(--xd-divider, #44444e);
+  border-radius: 2px;
+  background: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.swatch-label input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.swatch-label input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 1px;
 }

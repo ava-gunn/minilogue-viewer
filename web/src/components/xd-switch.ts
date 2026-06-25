@@ -1,5 +1,4 @@
-import { on } from '../events/bus'
-import { adoptStyles, define, splitLabels } from './util'
+import { adoptStyles, define, onParam, splitLabels } from './util'
 
 const styles = `
   :host {
@@ -23,18 +22,30 @@ const styles = `
     box-shadow: inset 0 0 0 1px #0009;
   }
 
+  /* Two levers: program (loaded patch) and live (synth's actual position). */
   .lever {
     position: absolute;
-    left: 2px;
-    right: 2px;
     top: 2px;
     height: calc((100% - 4px) / var(--positions, 2));
-    border-radius: 0.35rem;
-    background: linear-gradient(#6c6c74, #2a2a30);
-    box-shadow: 0 1px 2px #000c, inset 0 1px 0 #ffffff22;
-    transform: translateY(calc(var(--active, 0) * 100%));
+    border-radius: 0.3rem;
+    box-shadow: 0 1px 2px #000c, inset 0 1px 0 #ffffff33;
     transition: transform var(--wa-transition-normal, 0.15s) ease;
   }
+  .lever.program {
+    left: 2px;
+    width: calc((100% - 6px) / 2);
+    background: var(--xd-knob-teal, #2dd4bf);
+    transform: translateY(calc(var(--active, 0) * 100%));
+  }
+  .lever.live {
+    right: 2px;
+    width: calc((100% - 6px) / 2);
+    background: var(--xd-knob-live, #f6a821);
+    transform: translateY(calc(var(--active-live, 0) * 100%));
+  }
+  /* Until the synth reports a value, the program lever fills the track. */
+  :host(:not([live])) .lever.live { display: none; }
+  :host(:not([live])) .lever.program { width: calc(100% - 4px); }
 
   .ticks {
     display: flex;
@@ -65,9 +76,10 @@ const styles = `
 class XdSwitch extends HTMLElement {
   #shadow = this.attachShadow({ mode: 'open' })
   #built = false
-  #off: (() => void) | undefined
+  #offs: Array<() => void> = []
   #positions: string[] = []
-  #active = 0
+  #program = 0
+  #live = -1
 
   connectedCallback(): void {
     if (!this.#built) {
@@ -75,17 +87,16 @@ class XdSwitch extends HTMLElement {
       this.#built = true
     }
     if (!this.hasAttribute('decorative')) {
-      this.#off = on('param:change', ({ section, key, value }) => {
-        if (section === this.dataset.section && key === this.dataset.paramKey) {
-          this.#apply(value)
-        }
-      })
+      this.#offs.push(
+        onParam('param:change', this, (v) => this.#applyProgram(v)),
+        onParam('param:live', this, (v) => this.#applyLive(v)),
+      )
     }
   }
 
   disconnectedCallback(): void {
-    this.#off?.()
-    this.#off = undefined
+    for (const off of this.#offs) off()
+    this.#offs = []
   }
 
   #build(): void {
@@ -100,28 +111,51 @@ class XdSwitch extends HTMLElement {
     const ticks = order
       .map(({ p, i }) => `<span data-index="${i}">${p}</span>`)
       .join('')
-    this.#shadow.innerHTML = `<div class="switch"><div class="track" part="track"><span class="lever" part="lever"></span></div><div class="ticks" part="ticks">${ticks}</div></div><span class="label" part="label">${label}</span>`
+    this.#shadow.innerHTML = `<div class="switch"><div class="track" part="track"><span class="lever program" part="lever"></span><span class="lever live" part="lever-live"></span></div><div class="ticks" part="ticks">${ticks}</div></div><span class="label" part="label">${label}</span>`
     this.setAttribute('role', 'img')
     const initial = this.getAttribute('value')
-    this.#apply(initial === null ? 0 : Number(initial))
+    this.#applyProgram(initial === null ? 0 : Number(initial))
   }
 
-  #apply(index: number): void {
+  #clamp(index: number): number {
     const count = Math.max(this.#positions.length, 1)
-    this.#active = Math.min(Math.max(Math.round(index), 0), count - 1)
-    const slot = this.hasAttribute('reverse')
-      ? count - 1 - this.#active
-      : this.#active
-    this.style.setProperty('--active', String(slot))
+    return Math.min(Math.max(Math.round(index), 0), count - 1)
+  }
+
+  /** Reverse-aware track slot for a position index. */
+  #slot(active: number): number {
+    const count = Math.max(this.#positions.length, 1)
+    return this.hasAttribute('reverse') ? count - 1 - active : active
+  }
+
+  #applyProgram(index: number): void {
+    this.#program = this.#clamp(index)
+    this.style.setProperty('--active', String(this.#slot(this.#program)))
     for (const el of this.#shadow.querySelectorAll('.ticks span')) {
       el.classList.toggle(
         'on',
-        Number(el.getAttribute('data-index')) === this.#active,
+        Number(el.getAttribute('data-index')) === this.#program,
       )
     }
+    this.#updateAria()
+  }
+
+  #applyLive(index: number): void {
+    this.#live = this.#clamp(index)
+    this.setAttribute('live', '')
+    this.style.setProperty('--active-live', String(this.#slot(this.#live)))
+    this.#updateAria()
+  }
+
+  #updateAria(): void {
     const label = this.getAttribute('label') ?? ''
-    const pos = this.#positions[this.#active] ?? String(this.#active)
-    this.setAttribute('aria-label', label ? `${label}: ${pos}` : pos)
+    const prog = this.#positions[this.#program] ?? String(this.#program)
+    const live = this.#positions[this.#live] ?? String(this.#live)
+    const readout =
+      this.#live >= 0 && this.#live !== this.#program
+        ? `${prog} (synth ${live})`
+        : prog
+    this.setAttribute('aria-label', label ? `${label}: ${readout}` : readout)
   }
 }
 

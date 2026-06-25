@@ -30,6 +30,8 @@ html {
 
   /* Knob + control accents */
   --xd-knob-teal: var(--wa-color-teal-40);
+  /* Second knob needle: the live position from the connected synth's knob. */
+  --xd-knob-live: #f6a821;
   --xd-knob-body: #2a2a30;
   --xd-knob-cap: #3a3a42;
   --xd-led-on: var(--wa-color-teal-40);

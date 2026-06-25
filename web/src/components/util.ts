@@ -1,3 +1,5 @@
+import { on } from '../events/bus'
+
 /**
  * Adopt a stylesheet into a shadow root, falling back to a <style> element
  * where constructable stylesheets aren't supported (e.g. jsdom under Vitest).
@@ -36,4 +38,20 @@ export function splitLabels(attr: string | null): string[] {
 /** Register a custom element once (tests re-import modules). */
 export function define(name: string, ctor: CustomElementConstructor): void {
   if (!customElements.get(name)) customElements.define(name, ctor)
+}
+
+/**
+ * Subscribe to a param event scoped to an element's data-section/data-param-key.
+ * Used for both the program layer (param:change) and the live layer (param:live).
+ */
+export function onParam(
+  event: 'param:change' | 'param:live',
+  el: HTMLElement,
+  cb: (value: number, display: string | undefined) => void,
+): () => void {
+  return on(event, ({ section, key, value, display }) => {
+    if (section === el.dataset.section && key === el.dataset.paramKey) {
+      cb(value, display)
+    }
+  })
 }

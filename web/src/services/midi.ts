@@ -11,8 +11,9 @@ import {
 } from '../parser/korg-sysex'
 
 export interface MidiHandlers {
-  /** Decoded 1024-byte prog_bin from a current-program dump. */
-  onDump: (prog: Uint8Array) => void
+  /** Decoded 1024-byte prog_bin from a current-program dump. seedLive is false
+      when the dump was triggered by a program change (live needles stay put). */
+  onDump: (prog: Uint8Array, seedLive: boolean) => void
   /** A Control Change (controller, value), each 0..127. */
   onControlChange: (controller: number, value: number) => void
 }
@@ -62,6 +63,9 @@ export async function connectMidi(
   }
 
   let refreshTimer: ReturnType<typeof setTimeout> | undefined
+  // Whether the next dump should also reset the live layer. True for connect /
+  // manual refresh; set false by a program change.
+  let pendingSeedLive = true
 
   function deviceName(): string | undefined {
     const ports = [...access.inputs.values(), ...access.outputs.values()]
@@ -82,7 +86,8 @@ export async function connectMidi(
     }
   }
 
-  function refresh(): void {
+  function refresh(seedLive = true): void {
+    pendingSeedLive = seedLive
     if (refreshTimer) clearTimeout(refreshTimer)
     refreshTimer = setTimeout(sendRequest, 120)
   }
@@ -93,7 +98,9 @@ export async function connectMidi(
     if (data[0] === 0xf0) {
       if (isCurrentProgramDump(data)) {
         try {
-          handlers.onDump(decodeCurrentProgramDump(data))
+          const seedLive = pendingSeedLive
+          pendingSeedLive = true
+          handlers.onDump(decodeCurrentProgramDump(data), seedLive)
         } catch (err) {
           emit('file:error', {
             message: `Bad program dump: ${err instanceof Error ? err.message : String(err)}`,
@@ -106,7 +113,9 @@ export async function connectMidi(
     if (kind === 0xb0 && data.length >= 3) {
       handlers.onControlChange(data[1], data[2])
     } else if (kind === 0xc0) {
-      refresh() // program change → re-pull the full program
+      // Program change → re-pull program values, but leave the live (synth)
+      // needles where they are: only the program needles should jump.
+      refresh(false)
     }
   }
 

@@ -108,8 +108,8 @@
     <section class="grp grp-fx" aria-label="Effects and display">
       <span class="grp-label">EFFECTS</span>
       <div class="pair">
-        <xd-switch positions="MOD,REV,DEL" value="1" decorative></xd-switch>
-        <xd-switch positions="ON,OFF" decorative></xd-switch>
+        <xd-fx-status></xd-fx-status>
+        <xd-switch positions="OFF,ON" reverse data-section="reverb" data-param-key="on"></xd-switch>
       </div>
       <xd-knob label="TIME" data-section="reverb" data-param-key="time"></xd-knob>
       <xd-knob label="DEPTH" data-section="reverb" data-param-key="depth"></xd-knob>

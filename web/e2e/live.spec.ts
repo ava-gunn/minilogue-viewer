@@ -22,11 +22,11 @@ const DUMP = [
   0xf7,
 ]
 
-const knobAngle = (page: Page, key: string) =>
+const knobProp = (page: Page, key: string, prop: string) =>
   page
     .locator(`xd-knob[data-param-key="${key}"]`)
     .first()
-    .evaluate((el) => el.style.getPropertyValue('--knob-angle'))
+    .evaluate((el, p) => el.style.getPropertyValue(p), prop)
 
 const oledName = (page: Page) =>
   page
@@ -70,26 +70,58 @@ async function fakeMidi(page: Page, dump: number[]): Promise<void> {
   }, dump)
 }
 
-test('live page connects, pulls the current program, and mirrors a CC', async ({
+test('detects a synth, pulls its program, and mirrors a live CC', async ({
   page,
 }) => {
   await fakeMidi(page, DUMP)
-  await page.goto('/live.html')
+  await page.goto('/')
 
   await expect.poll(() => statusState(page)).toBe('connected')
 
-  // The auto-requested dump renders the program onto the panel.
+  // The auto-requested dump renders the program onto the panel (program layer).
   await expect.poll(() => oledName(page)).toBe('Replicant xd')
   await expect(
     page.locator('xd-wave-selector[data-section="vco1"]'),
   ).toHaveAttribute('aria-label', 'WAVE: SAW')
 
-  // A live Control Change moves only the matching knob (cutoff → 0).
-  const cutoffBefore = await knobAngle(page, 'cutoff')
+  // A live Control Change moves the LIVE needle only; the program needle stays.
+  const liveBefore = await knobProp(page, 'cutoff', '--knob-angle-live')
+  const progBefore = await knobProp(page, 'cutoff', '--knob-angle')
   await page.evaluate(() =>
     (window as unknown as { __emitMidi: (b: number[]) => void }).__emitMidi([
       0xb0, 43, 0,
     ]),
   )
-  await expect.poll(() => knobAngle(page, 'cutoff')).not.toBe(cutoffBefore)
+  await expect
+    .poll(() => knobProp(page, 'cutoff', '--knob-angle-live'))
+    .not.toBe(liveBefore)
+  expect(await knobProp(page, 'cutoff', '--knob-angle')).toBe(progBefore)
+
+  // A toggle mirrors program vs synth too: flip VCO1 wave on the synth (→ TRI).
+  await page.evaluate(() =>
+    (window as unknown as { __emitMidi: (b: number[]) => void }).__emitMidi([
+      0xb0, 50, 64,
+    ]),
+  )
+  const wave = page.locator('xd-wave-selector[data-section="vco1"]')
+  await expect(wave).toHaveAttribute('live', '')
+  await expect
+    .poll(() =>
+      wave.evaluate((el) => el.style.getPropertyValue('--active-live')),
+    )
+    .toBe('1') // synth → TRI (slot 1)
+  expect(
+    await wave.evaluate((el) => el.style.getPropertyValue('--active')),
+  ).toBe('0') // program stays SAW (slot 0)
+
+  // The legend swatch recolors the program indicator.
+  await page.locator('#color-prog').evaluate((el) => {
+    ;(el as HTMLInputElement).value = '#ff0000'
+    el.dispatchEvent(new Event('input'))
+  })
+  expect(
+    await page.evaluate(() =>
+      document.documentElement.style.getPropertyValue('--xd-knob-teal'),
+    ),
+  ).toBe('#ff0000')
 })

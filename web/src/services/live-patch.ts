@@ -1,14 +1,19 @@
-// Live panel mirror: translate the Control Change stream the minilogue xd sends
-// when its knobs/switches move into single-control updates. Each CC writes one
-// field of a mutable RawPatch (seeded by the last SysEx snapshot), which is then
-// run back through the existing parsePatch + PARAMS descriptors — so live edits
-// render byte-identically to a loaded file. CC map: minilogue xd MIDI Impl 1.01.
+// Live panel mirror. Two layers feed the panel:
+//   • program layer  — emitted as patch:load (file load OR SysEx dump), fanned
+//     out to param:change by sections/shared. This is the loaded program value.
+//   • live layer      — emitted here as param:live: the synth's ACTUAL current
+//     control positions. Seeded from each dump (actual == program at that
+//     instant) then updated per incoming Control Change as knobs move.
+// Each CC writes one field of a mutable RawPatch and is run back through the
+// existing parsePatch + PARAMS descriptors, so live edits render identically to
+// a loaded file. CC map: minilogue xd MIDI Implementation Rev 1.01.
 
 import { emit } from '../events/bus'
 import { type RawPatch, readRawPatch } from '../parser/binary'
-import { MULTI_TYPE } from '../parser/enums'
+import { MULTI_ENGINE_COUNT, MULTI_TYPE } from '../parser/enums'
 import { parsePatch } from '../parser/patch'
-import { PARAMS } from '../sections/params'
+import { PARAMS, type ParamDescriptor } from '../sections/params'
+import type { MinilogueXDPatch } from '../types/synth'
 
 /** CC#63 carries the low 3 bits of a 10-bit value, sent just before its own CC. */
 const CC_LSB = 63
@@ -36,8 +41,21 @@ function applyMultiShape(raw: RawPatch, value: number): void {
   else raw.shapeNoise = value
 }
 
-// Voice-mode selector, multi sub-type and the deep VPM/USER params have no
-// transmittable CC — they refresh from the SysEx snapshot, not live.
+// Multi sub-type select (CC#103): the value range maps across the active
+// engine's sub-types (NOISE has 4, VPM/USER 16). Drives the multi LCD label.
+function applyMultiSelect(raw: RawPatch, v: number): void {
+  const type = MULTI_TYPE[raw.multiType] ?? 'NOISE'
+  const count = MULTI_ENGINE_COUNT[type]
+  // Each sub-type owns a 128/count-wide band of the CC range. (round() over
+  // count-1 collided 72 & 80 onto FAT2 and skipped CREEP for VPM's 16 types.)
+  const index = Math.min(count - 1, Math.floor((v * count) / 128))
+  if (type === 'VPM') raw.selectVPM = index
+  else if (type === 'USER') raw.selectUser = index
+  else raw.selectNoise = index
+}
+
+// Voice-mode selector and the deep VPM/USER params have no transmittable CC —
+// they refresh from the SysEx snapshot, not live.
 const CC_TABLE: Record<number, CcSpec> = {
   // continuous 10-bit
   16: {
@@ -211,6 +229,15 @@ const CC_TABLE: Record<number, CcSpec> = {
     },
   },
 
+  // multi sub-type select (HIGH/LOW/… for NOISE; SIN1/… for VPM; slot for USER)
+  103: {
+    section: 'multi',
+    key: 'typeValue',
+    apply: (r, v) => {
+      applyMultiSelect(r, v)
+    },
+  },
+
   // enum / switch — snap to the transmitted breakpoints
   23: {
     section: 'filterEnv',
@@ -303,12 +330,36 @@ const CC_TABLE: Record<number, CcSpec> = {
       r.cutoffDrive = enum3(v)
     },
   },
+
+  // effects on/off
+  92: {
+    section: 'modFx',
+    key: 'on',
+    apply: (r, v) => {
+      r.modFxOn = onOff(v)
+    },
+  },
+  93: {
+    section: 'delay',
+    key: 'on',
+    apply: (r, v) => {
+      r.delayOn = onOff(v)
+    },
+  },
+  94: {
+    section: 'reverb',
+    key: 'on',
+    apply: (r, v) => {
+      r.reverbOn = onOff(v)
+    },
+  },
 }
 
 export interface LivePatch {
-  /** Seed the live model from a full SysEx program dump and render the panel. */
-  loadDump: (prog: Uint8Array) => void
-  /** Apply one incoming Control Change; updates a single control if mapped. */
+  /** Load a SysEx dump into the program layer; seedLive also resets the live
+      layer (connect/refresh). Pass false on a program change. */
+  loadDump: (prog: Uint8Array, seedLive?: boolean) => void
+  /** Apply one incoming Control Change; updates the live layer for one control. */
   controlChange: (cc: number, value: number) => void
   hasSnapshot: () => boolean
 }
@@ -317,9 +368,26 @@ export function createLivePatch(): LivePatch {
   let raw: RawPatch | null = null
   let pendingLsb = 0
 
-  function loadDump(prog: Uint8Array): void {
+  function emitLive(d: ParamDescriptor, patch: MinilogueXDPatch): void {
+    const value = d.value(patch)
+    const display = d.display?.(patch)
+    emit(
+      'param:live',
+      display === undefined
+        ? { section: d.section, key: d.key, value }
+        : { section: d.section, key: d.key, value, display },
+    )
+  }
+
+  // seedLive: true on connect / manual Refresh, to establish the live baseline.
+  // false on a program change — the physical knobs haven't moved, so the synth
+  // (live) needles must stay put while only the program needles jump.
+  function loadDump(prog: Uint8Array, seedLive = true): void {
     raw = readRawPatch(prog)
-    emit('patch:load', { patch: parsePatch(raw), index: 0, total: 1 })
+    const patch = parsePatch(raw)
+    // Program layer (drives the existing fanout → param:change).
+    emit('patch:load', { patch, index: 0, total: 1 })
+    if (seedLive) for (const d of PARAMS) emitLive(d, patch)
   }
 
   function controlChange(cc: number, value: number): void {
@@ -335,16 +403,14 @@ export function createLivePatch(): LivePatch {
 
     spec.apply(raw, value, lsb)
     const patch = parsePatch(raw)
+    // The multi engine couples select/shape/type, so refresh the whole section;
+    // otherwise emit only the control that changed.
     for (const d of PARAMS) {
-      if (d.section !== spec.section || d.key !== spec.key) continue
-      const v = d.value(patch)
-      const display = d.display?.(patch)
-      emit(
-        'param:change',
-        display === undefined
-          ? { section: d.section, key: d.key, value: v }
-          : { section: d.section, key: d.key, value: v, display },
-      )
+      const match =
+        spec.section === 'multi'
+          ? d.section === 'multi'
+          : d.section === spec.section && d.key === spec.key
+      if (match) emitLive(d, patch)
     }
   }
 

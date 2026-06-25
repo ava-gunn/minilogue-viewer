@@ -7,3 +7,6 @@
 
 /* Panel layout. */
 @import "./panel.css";
+
+/* Live-MIDI status bar. */
+@import "./midi.css";

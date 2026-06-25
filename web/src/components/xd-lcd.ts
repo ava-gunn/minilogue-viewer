@@ -1,5 +1,4 @@
-import { on } from '../events/bus'
-import { adoptStyles, define } from './util'
+import { adoptStyles, define, onParam } from './util'
 
 const styles = `
   :host {
@@ -35,23 +34,24 @@ const styles = `
 class XdLcd extends HTMLElement {
   #shadow = this.attachShadow({ mode: 'open' })
   #built = false
-  #off: (() => void) | undefined
+  #offs: Array<() => void> = []
 
   connectedCallback(): void {
     if (!this.#built) {
       this.#build()
       this.#built = true
     }
-    this.#off = on('param:change', ({ section, key, value, display }) => {
-      if (section === this.dataset.section && key === this.dataset.paramKey) {
-        this.#set(display ?? String(value))
-      }
-    })
+    const set = (value: number, display: string | undefined): void =>
+      this.#set(display ?? String(value))
+    this.#offs.push(
+      onParam('param:change', this, set),
+      onParam('param:live', this, set),
+    )
   }
 
   disconnectedCallback(): void {
-    this.#off?.()
-    this.#off = undefined
+    for (const off of this.#offs) off()
+    this.#offs = []
   }
 
   #build(): void {

@@ -48,7 +48,12 @@ function initTooltips(): void {
   container.id = 'tooltips'
   document.body.append(container)
 
-  const tips = new Map<string, HTMLElement>()
+  interface Tip {
+    el: HTMLElement
+    prog?: string
+    live?: string
+  }
+  const tips = new Map<string, Tip>()
   let i = 0
   for (const knob of document.querySelectorAll<HTMLElement>(
     'xd-knob[data-section]',
@@ -63,12 +68,30 @@ function initTooltips(): void {
     tip.setAttribute('placement', 'top')
     tip.textContent = '—'
     container.append(tip)
-    tips.set(`${knob.dataset.section}:${knob.dataset.paramKey}`, tip)
+    tips.set(`${knob.dataset.section}:${knob.dataset.paramKey}`, { el: tip })
   }
 
+  const render = (t: Tip): void => {
+    const prog = t.prog ?? '—'
+    t.el.textContent =
+      t.live !== undefined && t.live !== t.prog ? `${prog} → ${t.live}` : prog
+  }
+
+  // Program value (loaded patch) and the live synth value share each tooltip.
   on('param:change', ({ section, key, display }) => {
     if (display === undefined) return
-    const tip = tips.get(`${section}:${key}`)
-    if (tip) tip.textContent = display
+    const t = tips.get(`${section}:${key}`)
+    if (t) {
+      t.prog = display
+      render(t)
+    }
+  })
+  on('param:live', ({ section, key, display }) => {
+    if (display === undefined) return
+    const t = tips.get(`${section}:${key}`)
+    if (t) {
+      t.live = display
+      render(t)
+    }
   })
 }

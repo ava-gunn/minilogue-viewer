@@ -25,6 +25,8 @@ export interface AppEventMap {
   'file:parsed-lib': { name: string; patches: MinilogueXDPatch[] }
   'patch:load': { patch: MinilogueXDPatch; index: number; total: number }
   'param:change': ParamChange
+  /** Live value from the connected synth's physical control (mirrors a CC). */
+  'param:live': ParamChange
   'file:error': { message: string }
   /** Live-MIDI connection state, for the /live page status indicator. */
   'midi:status': {
