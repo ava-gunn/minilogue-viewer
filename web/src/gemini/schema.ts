@@ -109,6 +109,18 @@ export const ANALYSIS_FIELDS: Record<string, string> = {
     'audible effects only: chorus/ensemble (MOD), echo (DELAY), room/space tail (REVERB); "dry" if none',
 }
 
+// Numeric AMP envelope (each 0..1), estimated during the LISTEN pass where the waveform is
+// visible and applied directly to the amp EG. The prose `dynamics` alone wasn't reliably
+// translated into params — patches sustained when the description didn't — so we quantify it.
+export const ENVELOPE_FIELDS: Record<string, string> = {
+  attack: 'attack time 0..1 (0 = instant/immediate onset, 1 = very slow fade-in)',
+  decay: 'decay time 0..1 — time to fall from the peak to the sustain level',
+  sustain:
+    'sustain LEVEL 0..1 — the level held WHILE the note continues. 0 if the sound decays to silence on its own (plucked, percussive, one-shot hit); high ONLY if it holds at a steady level',
+  release:
+    'release time 0..1 — how long it rings after note-off (0 = stops instantly; high only for long tails / pads)',
+}
+
 function paramSchema(id: string): GeminiSchema {
   const p = PARAM_SPEC.find((s) => s.id === id)
   if (!p) throw new Error(`unknown param ${id}`)
@@ -139,12 +151,36 @@ export function buildAnalysisSchema(): GeminiSchema {
     properties[id] = { type: 'STRING', description }
     ordering.push(id)
   }
+
+  const envProps: Record<string, GeminiSchema> = {}
+  const envOrder: string[] = []
+  for (const [id, description] of Object.entries(ENVELOPE_FIELDS)) {
+    envProps[id] = { type: 'NUMBER', description }
+    envOrder.push(id)
+  }
+  properties.envelope = {
+    type: 'OBJECT',
+    description: 'numeric AMP envelope estimated from the waveform (each 0..1)',
+    properties: envProps,
+    propertyOrdering: envOrder,
+    required: envOrder,
+  }
+  ordering.push('envelope')
+
   return {
     type: 'OBJECT',
     properties,
     propertyOrdering: ordering,
     required: ordering,
   }
+}
+
+/** Map a 0..1 value to the raw integer range of a continuous param id (mirrors programToRawById),
+ *  so the listen pass's measured envelope can be written straight onto the amp EG. */
+export function continuousToRaw(id: string, value: number): number {
+  const p = PARAM_SPEC.find((s) => s.id === id)
+  if (p?.type !== 'continuous') return 0
+  return Math.round(clamp(Number(value) || 0, 0, 1) * p.rawMax)
 }
 
 /** Pass-2 responseSchema: the `program` (one property per param id in spec order) plus a short

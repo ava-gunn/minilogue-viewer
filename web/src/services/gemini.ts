@@ -8,6 +8,7 @@
 import {
   buildAnalysisSchema,
   buildProgramSchema,
+  continuousToRaw,
   PARAM_GLOSSARY,
   PROMPT_VERSION,
   programToRawById,
@@ -50,6 +51,7 @@ Fill every analysis field:
 - harmonics: harmonic content / timbre (buzzy and full of harmonics, hollow, soft and rounded, noisy, metallic/inharmonic, FM-like…).
 - movement: periodic modulation and its rough rate/depth (vibrato, tremolo, PWM, wah), or "none".
 - effects: audible effects only (chorus/ensemble, delay/echo, reverb/space), or "dry".
+- envelope: numeric AMP envelope (attack, decay, sustain, release, each 0..1) measured from the waveform — these drive the synth's amp EG directly, so be accurate. sustain is the LEVEL held while the note continues: 0 for a sound that decays to silence on its own (plucked, percussive, one-shot), high only for a sound that holds steady. release is the tail after note-off: short unless it visibly rings out. Keep these consistent with your prose "dynamics".
 
 Be specific and honest: if something is steady or absent, say so. Return ONLY JSON matching the schema.`
 
@@ -143,14 +145,18 @@ const durationNote = (durationSec?: number): string =>
     ? ` The clip is ${durationSec.toFixed(2)} seconds long; describe and scale envelope times relative to that.`
     : ''
 
-/** Pass 1 — listen to the clip and return a structured description of the SOURCE sound. */
+/** Pass 1 — listen to the clip and return a structured description of the SOURCE sound, plus a
+ *  numeric AMP envelope measured from the waveform. */
 async function describeAudio(
   ai: GenAI,
   model: string,
   file: File,
   waveformPng: string | undefined,
   durationSec: number | undefined,
-): Promise<Record<string, string>> {
+): Promise<{
+  analysis: Record<string, string>
+  envelope: Record<string, number> | undefined
+}> {
   const data = await toBase64(file)
   const parts: ContentPart[] = [
     { inlineData: { mimeType: audioMime(file), data } },
@@ -175,9 +181,15 @@ async function describeAudio(
     contents: [{ role: 'user', parts }],
   })
   const parsed = parseJson(response.text, 'analysis')
-  return Object.fromEntries(
+  const analysis = Object.fromEntries(
     Object.entries(parsed).filter(([, v]) => typeof v === 'string'),
   ) as Record<string, string>
+  const env = parsed.envelope
+  const envelope =
+    env && typeof env === 'object' && !Array.isArray(env)
+      ? (env as Record<string, number>)
+      : undefined
+  return { analysis, envelope }
 }
 
 /** Pass 2 — design the minilogue xd program from the pass-1 analysis (no audio needed). */
@@ -245,7 +257,13 @@ export async function analyzeAudio(
   const ai = new GoogleGenAI({ apiKey }) as unknown as GenAI
 
   onProgress?.('Listening to the audio…')
-  const analysis = await describeAudio(ai, model, file, waveformPng, durationSec)
+  const { analysis, envelope } = await describeAudio(
+    ai,
+    model,
+    file,
+    waveformPng,
+    durationSec,
+  )
 
   onProgress?.('Designing the patch…')
   const { program, name, rationale } = await designProgram(
@@ -255,5 +273,23 @@ export async function analyzeAudio(
     durationSec,
   )
 
-  return { rawById: programToRawById(program), name, rationale, analysis }
+  const rawById = programToRawById(program)
+  // The AMP envelope is measured in the listen pass (where the waveform is visible) and written
+  // straight onto the amp EG — pass 2's prose interpretation tended to over-sustain, producing
+  // patches that droned on when the description said otherwise.
+  const AMP_EG: Record<string, string> = {
+    attack: 'amp_attack',
+    decay: 'amp_decay',
+    sustain: 'amp_sustain',
+    release: 'amp_release',
+  }
+  if (envelope) {
+    for (const [k, id] of Object.entries(AMP_EG)) {
+      if (typeof envelope[k] === 'number') rawById[id] = continuousToRaw(id, envelope[k])
+    }
+    const n = (v: number): string => (typeof v === 'number' ? v.toFixed(2) : '?')
+    analysis.envelope = `attack ${n(envelope.attack)}, decay ${n(envelope.decay)}, sustain ${n(envelope.sustain)}, release ${n(envelope.release)}`
+  }
+
+  return { rawById, name, rationale, analysis }
 }

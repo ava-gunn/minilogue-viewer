@@ -4,6 +4,8 @@ import {
   ANALYSIS_FIELDS,
   buildAnalysisSchema,
   buildProgramSchema,
+  continuousToRaw,
+  ENVELOPE_FIELDS,
   PARAM_GLOSSARY,
   programToRawById,
 } from './schema'
@@ -31,15 +33,35 @@ describe('buildProgramSchema', () => {
 })
 
 describe('buildAnalysisSchema', () => {
-  it('is a flat object with one required string field per analysis trait', () => {
+  it('has the string analysis fields plus a numeric envelope object, all required', () => {
     const schema = buildAnalysisSchema()
+    const keys = [...Object.keys(ANALYSIS_FIELDS), 'envelope']
     expect(schema.type).toBe('OBJECT')
-    expect(Object.keys(schema.properties ?? {})).toEqual(
-      Object.keys(ANALYSIS_FIELDS),
-    )
-    expect(schema.propertyOrdering).toEqual(Object.keys(ANALYSIS_FIELDS))
-    expect(schema.required).toEqual(Object.keys(ANALYSIS_FIELDS))
+    expect(Object.keys(schema.properties ?? {})).toEqual(keys)
+    expect(schema.required).toEqual(keys)
     expect(schema.properties?.sound_type?.type).toBe('STRING')
+
+    const env = schema.properties?.envelope
+    expect(env?.type).toBe('OBJECT')
+    expect(Object.keys(env?.properties ?? {})).toEqual(
+      Object.keys(ENVELOPE_FIELDS),
+    )
+    expect(env?.required).toEqual(Object.keys(ENVELOPE_FIELDS))
+    expect(env?.properties?.sustain?.type).toBe('NUMBER')
+  })
+})
+
+describe('continuousToRaw', () => {
+  it('maps 0..1 to the param raw range, clamping out-of-range', () => {
+    expect(continuousToRaw('amp_sustain', 0)).toBe(0)
+    expect(continuousToRaw('amp_sustain', 1)).toBe(1023)
+    expect(continuousToRaw('amp_sustain', 2)).toBe(1023)
+    expect(continuousToRaw('portamento', 1)).toBe(127) // 8-bit param
+  })
+
+  it('returns 0 for unknown or non-continuous params', () => {
+    expect(continuousToRaw('vco1_wave', 1)).toBe(0) // discrete
+    expect(continuousToRaw('nope', 1)).toBe(0)
   })
 })
 

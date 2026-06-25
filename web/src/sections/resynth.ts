@@ -65,6 +65,7 @@ const ANALYSIS_LABELS: Record<string, string> = {
   harmonics: 'Harmonics',
   movement: 'Movement',
   effects: 'Effects',
+  envelope: 'Envelope',
 }
 function formatResult(
   rationale: string | undefined,
