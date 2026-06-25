@@ -232,7 +232,11 @@ export function initResynth(): void {
     if (playBtn) playBtn.textContent = '▶'
     if (progress) progress.style.width = '0%'
     preview?.removeAttribute('hidden')
-    void drawWaveform(f)
+    void drawWaveform(f).finally(() => {
+      // Waveform ready (or decode failed) → safe to generate. Enable even on failure so the
+      // audio can still be sent; the screenshot is simply omitted when there's nothing to grab.
+      if (generateBtn) generateBtn.disabled = false
+    })
   }
 
   playBtn?.addEventListener('click', () => {
@@ -271,7 +275,9 @@ export function initResynth(): void {
     file = f
     rawById = undefined
     if (filename) filename.textContent = f.name
-    if (generateBtn) generateBtn.disabled = false
+    // Keep Generate disabled until the waveform has rendered (loadPreview re-enables it) so the
+    // request always includes the waveform screenshot + duration, not just the audio.
+    if (generateBtn) generateBtn.disabled = true
     feedback?.setAttribute('hidden', '')
     loadPreview(f)
     setStatus('')
