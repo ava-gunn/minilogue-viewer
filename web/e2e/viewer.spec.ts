@@ -40,7 +40,7 @@ test('dropping a .mnlgxdlib opens the library and switches programs', async ({
   const panel = page.locator('#library-panel')
   await expect(panel).not.toHaveAttribute('hidden', /.*/)
 
-  const items = page.locator('#program-list li')
+  const items = page.locator('#program-list [role="option"]')
   await expect.poll(() => items.count()).toBeGreaterThan(1)
 
   // Clicking a program updates the OLED.

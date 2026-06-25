@@ -7,7 +7,12 @@ const styles = `
     display: inline-flex;
     flex-direction: column;
     font-family: var(--xd-font);
-    outline: none;
+  }
+  /* Real keyboard-focus ring on the host (the global focus rule can't pierce the shadow
+     root, and a 1px border swap is too weak a cue). */
+  :host(:focus-visible) {
+    outline: 2px solid var(--xd-knob-teal, #2dd4bf);
+    outline-offset: 3px;
   }
 
   .screen {

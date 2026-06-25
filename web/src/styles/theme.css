@@ -8,6 +8,11 @@ html {
    our --xd-* tokens available even if the dark class is absent. */
 .wa-dark,
 :where(:root) {
+  /* This Web Awesome build ships no `teal` family, so define the xd teal scale these tokens
+     resolve to (≈#2dd4bf). Without it --wa-color-brand / --xd-knob-teal / --xd-led-on resolve
+     unset and only survive via per-component literal fallbacks. */
+  --wa-color-teal: #2dd4bf;
+  --wa-color-teal-40: #2dd4bf;
   /* Remap brand to minilogue xd teal */
   --wa-color-brand: var(--wa-color-teal);
   --wa-color-brand-fill-normal: oklch(from var(--wa-color-teal-40) l c h / 1);
@@ -52,9 +57,10 @@ html {
   --xd-toggle-w: 0.85rem;
   --xd-toggle-h: 2rem;
 
-  /* Etched panel labels */
-  --xd-label-color: var(--wa-color-neutral-50);
-  --xd-label-bright: var(--wa-color-neutral-30);
+  /* Etched panel labels — neutral-60/80 for AA contrast on the dark group surfaces
+     (neutral-50/30 came out at ~3.9:1 / ~2:1 against the panel). */
+  --xd-label-color: var(--wa-color-neutral-60);
+  --xd-label-bright: var(--wa-color-neutral-80);
   --xd-font: var(--wa-font-family-mono);
 
   /* Dimmed decorative controls (rendered but inactive) */

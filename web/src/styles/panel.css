@@ -199,7 +199,7 @@ xd-knob[data-param-key="modeDepth"]::part(label) {
   grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
   gap: var(--wa-space-xs, 0.5rem);
 }
-#program-list li {
+#program-list [role="option"] {
   padding: var(--wa-space-xs, 0.5rem) var(--wa-space-s, 0.75rem);
   border-radius: 4px;
   border: 1px solid transparent;
@@ -207,11 +207,11 @@ xd-knob[data-param-key="modeDepth"]::part(label) {
   font-size: 0.8rem;
   color: var(--wa-color-neutral-on-quiet, #b4b4bc);
 }
-#program-list li:hover {
+#program-list [role="option"]:hover {
   background: var(--wa-color-surface-overlay, #2a2a31);
   border-color: var(--wa-color-neutral-border-normal, #3a3a42);
 }
-#program-list li[aria-selected="true"] {
+#program-list [role="option"][aria-selected="true"] {
   background: var(--wa-color-brand-fill-quiet, #0e2a26);
   border-color: var(--xd-knob-teal, #2dd4bf);
   color: var(--xd-label-bright, #c4c4cc);

@@ -82,7 +82,7 @@ const styles = `
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .lever { transition: none; }
+    .lever, .marker { transition: none; }
   }
 `
 

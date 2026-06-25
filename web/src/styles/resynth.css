@@ -59,7 +59,9 @@
 
 .resynth-steps li {
   position: relative;
-  opacity: 0.4;
+  /* 0.7 (not 0.4) so upcoming steps still clear AA contrast on the dark chassis; the active
+     step stands out via weight, and aria-current marks it programmatically. */
+  opacity: 0.7;
   padding-right: 1.25rem;
 }
 
@@ -85,7 +87,7 @@
 
 .resynth-steps li.done::before {
   content: "✓ ";
-  color: var(--wa-color-neutral-50, #8a8a93);
+  color: var(--wa-color-neutral-60, #9194a2);
 }
 
 /* Matches the .xd chassis (theme.css): same gradient, radius and shadow. */
@@ -375,4 +377,17 @@
 .resynth-thumb:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Reduced motion: stop the spinner + control transitions (light DOM; the panel web
+   components guard their own shadow-DOM animations). WCAG 2.3.3. */
+@media (prefers-reduced-motion: reduce) {
+  .resynth-spinner {
+    animation: none;
+  }
+  .resynth-drop,
+  .resynth-btn,
+  .resynth-thumb {
+    transition: none;
+  }
 }

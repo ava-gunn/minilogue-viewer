@@ -32,11 +32,11 @@ describe('createLivePatch', () => {
     expect(live.hasSnapshot()).toBe(false)
   })
 
-  it('leaves the live layer untouched on a program-change dump', () => {
+  it('a dump never seeds the live layer (only the program layer + raw baseline)', () => {
     const live = createLivePatch()
-    live.loadDump(progBin, false) // seedLive = false (program change)
-    expect(changes).toHaveLength(0) // no param:live emitted
-    expect(live.hasSnapshot()).toBe(true) // but the program raw is updated
+    live.loadDump(progBin)
+    expect(changes).toHaveLength(0) // no param:live emitted from a dump
+    expect(live.hasSnapshot()).toBe(true) // but the program raw is updated (for CC decode)
   })
 
   it('mirrors a 10-bit continuous CC (cutoff) using the CC#63 LSB', () => {
@@ -89,14 +89,12 @@ describe('createLivePatch', () => {
     expect(last('multi', 'typeValue')?.display).toBe('CREEP')
   })
 
-  it('pollDump refreshes only voice mode on the live layer', () => {
+  it('pollDump never seeds the live layer (live needles update only from CC)', () => {
     const live = createLivePatch()
     live.loadDump(progBin)
     changes.length = 0
-    live.pollDump(progBin)
-    expect(changes).toHaveLength(1)
-    expect(changes[0]?.section).toBe('voice')
-    expect(changes[0]?.key).toBe('mode')
+    live.pollDump()
+    expect(changes).toHaveLength(0)
   })
 
   it('mirrors voice mode type via CC#52', () => {

@@ -97,8 +97,8 @@
   cursor: pointer;
 }
 .swatch-label input[type="color"] {
-  inline-size: 0.95em;
-  block-size: 0.95em;
+  inline-size: 1.2rem;
+  block-size: 1.2rem;
   padding: 0;
   border: 1px solid var(--xd-divider, #44444e);
   border-radius: 2px;

@@ -17,19 +17,21 @@
     <script defer src="/_vercel/insights/script.js"></script>
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <div id="app">
       <header class="resynth-bar">
         <a class="resynth-back" href="/">← Viewer</a>
         <h1 class="resynth-heading">Audio → patch resynthesis</h1>
-        <span id="midi-status" class="midi-status" data-state="requesting">
+        <span id="midi-status" class="midi-status" role="status" data-state="requesting">
           <span class="midi-dot"></span>
           <span class="midi-text">Connecting to MIDI…</span>
         </span>
         <button id="midi-refresh" class="midi-refresh" type="button" hidden>Refresh</button>
       </header>
 
-      <!-- The synth shows the proposed patch; the form sits below it. -->
-      <div id="panel-root"></div>
+      <main id="main">
+        <!-- The synth shows the proposed patch; the form sits below it. -->
+        <div id="panel-root"></div>
 
       <!-- upload audio → get a patch → try it → send me feedback -->
       <ol id="resynth-steps" class="resynth-steps">
@@ -57,13 +59,13 @@
         <div id="gemini-creds" class="resynth-creds" hidden>
           <label class="resynth-field">
             <span>Gemini API token</span>
-            <input id="gemini-key" type="password" autocomplete="off" placeholder="AIza…" />
+            <input id="gemini-key" type="password" autocomplete="off" placeholder="AIza…" aria-describedby="gemini-note" />
           </label>
           <label class="resynth-field">
             <span>Model</span>
             <select id="gemini-model"></select>
           </label>
-          <p class="resynth-note">
+          <p class="resynth-note" id="gemini-note">
             Stored only in this browser, sent only to Google. Get a token at
             <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">
               aistudio.google.com/apikey</a>.
@@ -82,7 +84,7 @@
         <div id="resynth-preview" class="resynth-preview" hidden>
           <button id="resynth-play" type="button" class="resynth-play" aria-label="Play">▶</button>
           <div class="resynth-wave-wrap">
-            <canvas id="resynth-wave" class="resynth-wave" width="900" height="80"></canvas>
+            <canvas id="resynth-wave" class="resynth-wave" width="900" height="80" role="img" aria-label="Audio waveform preview"></canvas>
             <div id="resynth-progress" class="resynth-progress"></div>
           </div>
           <span id="resynth-time" class="resynth-time">0:00</span>
@@ -103,7 +105,7 @@
 
         <!-- feedback -->
         <div id="resynth-feedback" class="resynth-feedback" hidden>
-          <p class="resynth-result" id="resynth-result"></p>
+          <p class="resynth-result" id="resynth-result" aria-live="polite"></p>
           <div class="resynth-feedback-row">
             <label class="resynth-field resynth-field-inline" for="resynth-pitch">
               <span>Note played</span>
@@ -123,8 +125,9 @@
         </div>
       </section>
 
-      <!-- Transient status (errors) -->
-      <div id="status-bar" aria-live="polite"></div>
+        <!-- Transient status (errors) -->
+        <div id="status-bar" aria-live="polite"></div>
+      </main>
     </div>
 
     <script type="module" src="/src/resynth.ts"></script>

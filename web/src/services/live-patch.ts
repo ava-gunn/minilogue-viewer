@@ -400,13 +400,16 @@ const CC_TABLE: Record<number, CcSpec> = {
 }
 
 export interface LivePatch {
-  /** Load a SysEx dump into the program layer; seedLive also resets the live
-      layer (connect/refresh). Pass false on a program change. */
-  loadDump: (prog: Uint8Array, seedLive?: boolean) => void
-  /** Apply one incoming Control Change; updates the live layer for one control. */
+  /** Load a SysEx dump into the program layer (and the CC-decode baseline). Does NOT seed
+      the live layer — a control's synth needle appears only once its CC arrives. */
+  loadDump: (prog: Uint8Array) => void
+  /** Set the CC-decode baseline from a dump WITHOUT emitting patch:load — for views whose
+      program needles show something other than the synth's program (the re-synth page). */
+  setBaseline: (prog: Uint8Array) => void
+  /** Apply one incoming Control Change; reveals + updates the live layer for one control. */
   controlChange: (cc: number, value: number) => void
-  /** Periodic poll: refresh the live layer for params with no CC (voice mode). */
-  pollDump: (prog: Uint8Array) => void
+  /** Periodic poll handler — no-op: live needles update only from a Control Change. */
+  pollDump: () => void
   hasSnapshot: () => boolean
 }
 
@@ -425,15 +428,22 @@ export function createLivePatch(): LivePatch {
     )
   }
 
-  // seedLive: true on connect / manual Refresh, to establish the live baseline.
-  // false on a program change — the physical knobs haven't moved, so the synth
-  // (live) needles must stay put while only the program needles jump.
-  function loadDump(prog: Uint8Array, seedLive = true): void {
+  // A dump sets the program layer + the raw baseline for CC decoding, but never seeds the
+  // live (synth) layer: a dump carries the program's stored values, not the physical knob
+  // positions. A control's synth needle stays hidden until an actual CC (a physical move)
+  // tells us where that knob really is.
+  function loadDump(prog: Uint8Array): void {
     raw = readRawPatch(prog)
     const patch = parsePatch(raw)
     // Program layer (drives the existing fanout → param:change).
     emit('patch:load', { patch, index: 0, total: 1 })
-    if (seedLive) for (const d of PARAMS) emitLive(d, patch)
+  }
+
+  // Set only the CC-decode baseline from a dump — no program/live emit. The re-synth page
+  // uses this: its program needles show the GENERATED patch, so a synth dump must not
+  // overwrite them, but incoming CCs still need a raw baseline to decode against.
+  function setBaseline(prog: Uint8Array): void {
+    raw = readRawPatch(prog)
   }
 
   function controlChange(cc: number, value: number): void {
@@ -460,14 +470,15 @@ export function createLivePatch(): LivePatch {
     }
   }
 
-  // Refresh only params the synth never sends as CC (voice mode) from a poll
-  // dump, so they track the hardware without disturbing CC-driven needles.
-  function pollDump(prog: Uint8Array): void {
-    const patch = parsePatch(readRawPatch(prog))
-    for (const d of PARAMS) {
-      if (d.section === 'voice' && d.key === 'mode') emitLive(d, patch)
-    }
-  }
+  // No-op: the live (synth) needles update only from a Control Change (a physical move), so
+  // there's nothing to seed from a periodic dump. Kept so the MIDI poll handler stays wired.
+  function pollDump(): void {}
 
-  return { loadDump, controlChange, pollDump, hasSnapshot: () => raw !== null }
+  return {
+    loadDump,
+    setBaseline,
+    controlChange,
+    pollDump,
+    hasSnapshot: () => raw !== null,
+  }
 }

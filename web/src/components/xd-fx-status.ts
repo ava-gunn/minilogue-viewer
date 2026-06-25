@@ -25,6 +25,9 @@ const styles = `
     /* transparent bar reserves space so selecting one doesn't shift layout */
     border-inline-start: 2px solid transparent;
     padding-inline-start: 0.25rem;
+    /* Enlarge the keyboard/pointer hit area — the dot+label row is otherwise ~8px tall. */
+    padding-block: 0.3rem;
+    min-block-size: 1.25rem;
   }
   .fx:hover .label { color: var(--xd-label-bright, #c4c4cc); }
   .fx.active { border-inline-start-color: var(--wa-color-text-normal, #e0e0e6); }

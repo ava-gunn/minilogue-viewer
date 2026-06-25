@@ -72,10 +72,12 @@ export async function connectMidi(
   }
 
   let refreshTimer: ReturnType<typeof setTimeout> | undefined
-  // What the next dump response is for: 'full' = connect/refresh (seed live too),
-  // 'program' = program change (leave live needles), 'poll' = periodic SysEx-only
-  // refresh (voice mode etc.).
-  let pendingMode: 'full' | 'program' | 'poll' = 'full'
+  // What the NEXT requested dump is for: 'full' = connect/refresh (seed live too),
+  // 'program' = program change (leave live needles), 'poll' = periodic SysEx-only refresh
+  // (voice mode etc.), 'idle' = nothing requested. A dump consumes the mode then resets to
+  // 'idle', so a duplicate reply (the dump can arrive on more than one input port) or an
+  // unsolicited dump is ignored instead of re-seeding the live needles.
+  let pendingMode: 'full' | 'program' | 'poll' | 'idle' = 'idle'
 
   function deviceName(): string | undefined {
     const ports = [...access.inputs.values(), ...access.outputs.values()]
@@ -117,18 +119,16 @@ export async function connectMidi(
     refreshTimer = setTimeout(sendRequest, 120)
   }
 
-  // Web MIDI may split a long SysEx dump (≈1179 bytes) across several events, so
-  // reassemble from F0 to F7 before decoding instead of treating each event as a
-  // complete message (which truncated the dump → "decoded dump too short").
   const MAX_SYSEX = 8192
-  let sysex: number[] = []
-  let inSysex = false
 
   function handleSysex(msg: Uint8Array): void {
     if (!isCurrentProgramDump(msg)) return // ignore other SysEx (identity reply…)
+    // Consume the requested mode, then reset to 'idle' so a duplicate reply (the same dump on
+    // a second input port) or an unsolicited dump can't re-seed the live needles.
+    const mode = pendingMode
+    pendingMode = 'idle'
+    if (mode === 'idle') return
     try {
-      const mode = pendingMode
-      pendingMode = 'full'
       const prog = decodeCurrentProgramDump(msg)
       if (mode === 'poll') handlers.onPoll(prog)
       else handlers.onDump(prog, mode === 'full')
@@ -139,44 +139,67 @@ export async function connectMidi(
     }
   }
 
-  function handleMessage(e: MIDIMessageEvent): void {
-    const data = e.data
-    if (!data || data.length === 0) return
+  // Web MIDI may split a long SysEx dump (≈1179 bytes) across several events, so reassemble
+  // F0→F7 before decoding. State is PER INPUT: the minilogue xd exposes multiple input ports
+  // (SOUND, KBD/KNOB), and a single shared buffer let traffic on one port (CC / active
+  // sensing) interleave a dump on another → a corrupt, short message ("decoded dump too
+  // short"). Each port now reassembles independently, and a non-real-time status byte mid-
+  // SysEx abandons the partial buffer (a lost terminator) instead of corrupting it.
+  function makeMessageHandler(): (e: MIDIMessageEvent) => void {
+    let sysex: number[] = []
+    let inSysex = false
 
-    if (data[0] === 0xf0 || inSysex) {
-      // Standalone real-time bytes (clock / active sensing) can interleave a
-      // fragmented SysEx — don't fold them into the buffer.
-      if (inSysex && data[0] >= 0xf8) return
-      if (data[0] === 0xf0) {
-        sysex = []
-        inSysex = true
-      }
-      for (let i = 0; i < data.length; i++) sysex.push(data[i])
-      if (sysex[sysex.length - 1] === 0xf7) {
-        const msg = new Uint8Array(sysex)
-        sysex = []
-        inSysex = false
-        handleSysex(msg)
-      } else if (sysex.length > MAX_SYSEX) {
-        sysex = [] // runaway / lost terminator — drop it
-        inSysex = false
-      }
-      return
+    const finish = (): void => {
+      const msg = new Uint8Array(sysex)
+      sysex = []
+      inSysex = false
+      handleSysex(msg)
     }
 
-    const kind = data[0] & 0xf0
-    if (kind === 0xb0 && data.length >= 3) {
-      handlers.onControlChange(data[1], data[2])
-    } else if (kind === 0xc0) {
-      // Program change → re-pull program values, but leave the live (synth)
-      // needles where they are: only the program needles should jump.
-      refresh(false)
+    return (e: MIDIMessageEvent): void => {
+      const data = e.data
+      if (!data || data.length === 0) return
+      const status = data[0]
+
+      if (inSysex) {
+        if (status >= 0xf8) return // real-time bytes can interleave a SysEx — ignore them
+        if (status >= 0x80 && status !== 0xf7) {
+          // A new (non-real-time) status byte mid-SysEx → the dump lost its terminator.
+          // Drop the partial buffer and handle this event as a fresh message below.
+          sysex = []
+          inSysex = false
+        } else {
+          for (let i = 0; i < data.length; i++) sysex.push(data[i])
+          if (sysex[sysex.length - 1] === 0xf7) finish()
+          else if (sysex.length > MAX_SYSEX) {
+            sysex = [] // runaway / lost terminator — drop it
+            inSysex = false
+          }
+          return
+        }
+      }
+
+      if (status === 0xf0) {
+        sysex = Array.from(data)
+        inSysex = true
+        if (sysex[sysex.length - 1] === 0xf7) finish() // complete in one event
+        return
+      }
+
+      const kind = status & 0xf0
+      if (kind === 0xb0 && data.length >= 3) {
+        handlers.onControlChange(data[1], data[2])
+      } else if (kind === 0xc0) {
+        // Program change → re-pull program values, but leave the live (synth)
+        // needles where they are: only the program needles should jump.
+        refresh(false)
+      }
     }
   }
 
   function attachInputs(): void {
     for (const input of access.inputs.values()) {
-      input.onmidimessage = handleMessage
+      input.onmidimessage = makeMessageHandler()
     }
   }
 

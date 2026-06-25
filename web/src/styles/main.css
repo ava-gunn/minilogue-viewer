@@ -10,3 +10,43 @@
 
 /* Live-MIDI status bar. */
 @import "./midi.css";
+
+/* ── Accessibility: utilities + global behaviors (all three views import this) ── */
+
+/* Screen-reader-only content (skip-link target text, the viewer/embed h1). */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Skip link: off-screen until focused, then visible top-left. */
+.skip-link {
+  position: absolute;
+  inset-block-start: -3rem;
+  inset-inline-start: 0.5rem;
+  z-index: 1000;
+  padding: 0.5rem 0.85rem;
+  background: var(--xd-group-bg, #18181c);
+  color: var(--wa-color-text-normal, #f1f2f3);
+  border: 1px solid var(--xd-divider, #44444e);
+  border-radius: var(--wa-border-radius-m, 6px);
+  text-decoration: none;
+}
+.skip-link:focus {
+  inset-block-start: 0.5rem;
+}
+
+/* Visible keyboard focus for native + custom controls — the dark theme's default ring is
+   low-contrast and several bespoke controls lacked one (WCAG 2.4.7). */
+:where(button, a, input, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--wa-color-teal-40, #2dd4bf);
+  outline-offset: 2px;
+}

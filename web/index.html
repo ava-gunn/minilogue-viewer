@@ -17,25 +17,29 @@
     <script defer src="/_vercel/insights/script.js"></script>
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <div id="app">
+      <h1 class="visually-hidden">minilogue xd patch viewer</h1>
       <header class="midi-bar">
         <a class="resynth-link" href="/resynth.html">Resynthesis →</a>
-        <span id="midi-status" class="midi-status" data-state="requesting">
+        <span id="midi-status" class="midi-status" role="status" data-state="requesting">
           <span class="midi-dot"></span>
           <span class="midi-text">Connecting to MIDI…</span>
         </span>
         <button id="midi-refresh" class="midi-refresh" type="button" hidden>Refresh</button>
       </header>
 
-      <div id="panel-root"></div>
+      <main id="main">
+        <div id="panel-root"></div>
 
-      <!-- Program library drawer (.mnlgxdlib) -->
-      <wa-details id="library-panel" summary="Program library" hidden>
-        <ol id="program-list"></ol>
-      </wa-details>
+        <!-- Program library drawer (.mnlgxdlib) -->
+        <wa-details id="library-panel" summary="Program library" hidden>
+          <div id="program-list" role="listbox" aria-label="Program library"></div>
+        </wa-details>
 
-      <!-- Transient status (errors) -->
-      <div id="status-bar" aria-live="polite"></div>
+        <!-- Transient status (errors) -->
+        <div id="status-bar" aria-live="polite"></div>
+      </main>
     </div>
 
     <script type="module" src="/src/main.ts"></script>

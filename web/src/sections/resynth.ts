@@ -21,6 +21,7 @@ import {
   submitContribution,
 } from '../services/contribute'
 import { analyzeAudio, MODELS } from '../services/gemini'
+import { createLivePatch } from '../services/live-patch'
 import { connectMidi, type MidiController } from '../services/midi'
 import {
   mountTurnstile,
@@ -96,6 +97,8 @@ export function initResynth(): void {
       const i = STEPS.indexOf((li.dataset.step ?? '') as Step)
       li.classList.toggle('done', i < idx)
       li.classList.toggle('active', i === idx)
+      if (i === idx) li.setAttribute('aria-current', 'step')
+      else li.removeAttribute('aria-current')
     }
   }
   const engine = (): Engine => (geminiRadio?.checked ? 'gemini' : 'builtin')
@@ -137,6 +140,7 @@ export function initResynth(): void {
   // ---- audio preview (waveform + audition) ---------------------------------
   async function drawWaveform(f: File): Promise<void> {
     if (!canvas) return
+    canvas.setAttribute('aria-label', `Waveform of ${f.name}`)
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     const { width, height } = canvas
@@ -188,10 +192,16 @@ export function initResynth(): void {
     else audio.pause()
   })
   audio?.addEventListener('play', () => {
-    if (playBtn) playBtn.textContent = '⏸'
+    if (playBtn) {
+      playBtn.textContent = '⏸'
+      playBtn.setAttribute('aria-label', 'Pause')
+    }
   })
   const onStop = (): void => {
-    if (playBtn) playBtn.textContent = '▶'
+    if (playBtn) {
+      playBtn.textContent = '▶'
+      playBtn.setAttribute('aria-label', 'Play')
+    }
   }
   audio?.addEventListener('pause', onStop)
   audio?.addEventListener('ended', onStop)
@@ -394,20 +404,24 @@ export function initResynth(): void {
   byId<HTMLButtonElement>('midi-refresh')?.addEventListener('click', () =>
     midi?.refresh(),
   )
-  // Connect MIDI to detect the synth and capture its current program as a template.
-  // We only store the prog_bin (no patch:load) so the proposed patch keeps the panel.
+  // Mirror the connected synth's live knob moves onto the panel (so you can dial the proposed
+  // patch into the hardware). The program needles show the GENERATED patch, so a dump only
+  // sets the CC-decode baseline (setBaseline, no patch:load); each synth needle then appears
+  // when its knob is physically moved (a CC).
+  const live = createLivePatch()
   void (async () => {
     midi =
       (await connectMidi({
         onDump: (prog) => {
-          template = prog
+          template = prog // captured for the Load-patch button
+          live.setBaseline(prog)
           updateLoad()
         },
         onPoll: (prog) => {
           template = prog
           updateLoad()
         },
-        onControlChange: () => {},
+        onControlChange: (cc, value) => live.controlChange(cc, value),
       })) ?? undefined
   })()
 

@@ -33,26 +33,54 @@ export function initLibrary(): void {
     const list = document.getElementById('program-list')
     if (!panel || !list) return
 
+    const options = (): HTMLElement[] =>
+      Array.from(list.querySelectorAll<HTMLElement>('[role="option"]'))
+
     const select = (
       li: HTMLElement,
       patch: MinilogueXDPatch,
       index: number,
     ): void => {
-      for (const el of list.querySelectorAll('[aria-selected]')) {
-        el.removeAttribute('aria-selected')
+      // Roving tabindex: the selected option is the single tab stop for the listbox.
+      for (const el of options()) {
+        el.setAttribute('aria-selected', el === li ? 'true' : 'false')
+        el.tabIndex = el === li ? 0 : -1
       }
-      li.setAttribute('aria-selected', 'true')
       emit('patch:load', { patch, index, total: patches.length })
+    }
+
+    const focusAt = (i: number): void => {
+      const opts = options()
+      opts[((i % opts.length) + opts.length) % opts.length]?.focus()
     }
 
     list.replaceChildren(
       ...patches.map((patch, index) => {
-        const li = document.createElement('li')
-        li.setAttribute('role', 'option')
-        li.textContent = `${String(index + 1).padStart(3, '0')}  ${patch.name || 'INIT'}`
-        if (index === 0) li.setAttribute('aria-selected', 'true')
-        li.addEventListener('click', () => select(li, patch, index))
-        return li
+        const opt = document.createElement('div')
+        opt.setAttribute('role', 'option')
+        opt.tabIndex = index === 0 ? 0 : -1
+        opt.setAttribute('aria-selected', index === 0 ? 'true' : 'false')
+        opt.textContent = `${String(index + 1).padStart(3, '0')}  ${patch.name || 'INIT'}`
+        opt.addEventListener('click', () => select(opt, patch, index))
+        opt.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            select(opt, patch, index)
+          } else if (e.key === 'ArrowDown') {
+            e.preventDefault()
+            focusAt(index + 1)
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault()
+            focusAt(index - 1)
+          } else if (e.key === 'Home') {
+            e.preventDefault()
+            focusAt(0)
+          } else if (e.key === 'End') {
+            e.preventDefault()
+            focusAt(patches.length - 1)
+          }
+        })
+        return opt
       }),
     )
     panel.removeAttribute('hidden')

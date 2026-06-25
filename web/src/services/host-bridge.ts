@@ -27,7 +27,10 @@ function host(): HostBridge | undefined {
 function sendAndClose(payload: Record<string, unknown>): boolean {
   const bridge = host()
   if (!bridge) return false
-  bridge.postMessage({ method: 'close_and_send', params: [JSON.stringify(payload)] })
+  bridge.postMessage({
+    method: 'close_and_send',
+    params: [JSON.stringify(payload)],
+  })
   return true
 }
 

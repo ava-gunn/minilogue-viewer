@@ -6,22 +6,25 @@
     <title>minilogue xd viewer</title>
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <div id="app">
       <header class="midi-bar">
-        <span class="embed-title">minilogue xd viewer</span>
-        <a class="embed-web-link" href="https://minilogue-xd-viewer.vercel.app/">Web version<svg class="ext-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>
+        <h1 class="embed-title">minilogue xd viewer</h1>
+        <a class="embed-web-link" href="https://minilogue-xd-viewer.vercel.app/">Web version<span class="visually-hidden"> (opens the web app in your browser)</span><svg class="ext-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>
         <button id="embed-close" type="button" class="embed-close">Close</button>
       </header>
 
-      <div id="panel-root"></div>
+      <main id="main">
+        <div id="panel-root"></div>
 
-      <!-- Program library drawer (.mnlgxdlib) -->
-      <wa-details id="library-panel" summary="Program library" hidden>
-        <ol id="program-list"></ol>
-      </wa-details>
+        <!-- Program library drawer (.mnlgxdlib) -->
+        <wa-details id="library-panel" summary="Program library" hidden>
+          <div id="program-list" role="listbox" aria-label="Program library"></div>
+        </wa-details>
 
-      <!-- Transient status (errors) -->
-      <div id="status-bar" aria-live="polite"></div>
+        <!-- Transient status (errors) -->
+        <div id="status-bar" aria-live="polite"></div>
+      </main>
     </div>
 
     <script type="module" src="/src/embed.ts"></script>
