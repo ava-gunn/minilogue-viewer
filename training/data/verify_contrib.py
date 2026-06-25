@@ -162,7 +162,11 @@ def promote(args: argparse.Namespace) -> None:
             }
         )
 
-    (out / "samples.jsonl").write_text("".join(json.dumps(s) + "\n" for s in kept))
+    # Write the manifest atomically + drop mels only after it lands, so a crash never leaves
+    # a torn samples.jsonl or a mels.npy out of sync with it.
+    tmp = out / "samples.jsonl.tmp"
+    tmp.write_text("".join(json.dumps(s) + "\n" for s in kept))
+    tmp.replace(out / "samples.jsonl")
     shutil.copyfile(contrib / "meta.json", out / "meta.json")
     (out / "mels.npy").unlink(missing_ok=True)
     print(f"promoted {len(kept)}/{len(rows)} to {out} (verified split for finetune --contrib)")

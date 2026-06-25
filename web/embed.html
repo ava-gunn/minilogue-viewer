@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en" class="wa-dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>minilogue xd viewer</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="midi-bar">
+        <span class="embed-title">minilogue xd viewer</span>
+        <a class="resynth-link" href="#">Resynthesis →</a>
+      </header>
+
+      <div id="panel-root"></div>
+
+      <!-- Program library drawer (.mnlgxdlib) -->
+      <wa-details id="library-panel" summary="Program library" hidden>
+        <ol id="program-list"></ol>
+      </wa-details>
+
+      <!-- Transient status (errors) -->
+      <div id="status-bar" aria-live="polite"></div>
+    </div>
+
+    <script type="module" src="/src/embed.ts"></script>
+  </body>
+</html>

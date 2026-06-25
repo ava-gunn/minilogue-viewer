@@ -26,6 +26,7 @@ import argparse
 import json
 import os
 import tempfile
+import urllib.parse
 import urllib.request
 import wave
 from pathlib import Path
@@ -39,6 +40,10 @@ DEFAULT_TEMPLATE = _REPO / "web" / "replicant-example.mnlgxdprog"
 SR = schema.AUDIO["sample_rate"]
 
 _PARAM_IDS = [p["id"] for p in schema.PARAMS]
+# SSRF guard: only fetch contribution audio from the Vercel Blob host (override for a
+# custom blob domain). Keeps a tampered record from pointing the fetch at file:// or
+# an internal address.
+_BLOB_HOST_SUFFIX = os.environ.get("CONTRIB_BLOB_HOST_SUFFIX", ".public.blob.vercel-storage.com")
 
 
 def _write_wav(path: Path, audio: np.ndarray, sr: int) -> None:
@@ -61,10 +66,15 @@ def _fit(signal: np.ndarray, n: int = schema.N_SAMPLES) -> np.ndarray:
 
 
 def _decode_audio(url: str, ext: str) -> np.ndarray:
-    """Download a contribution clip and load it as the model input (SR, mono, 1s)."""
+    """Download a contribution clip and load it as the model input (SR, mono, 1s). Refuses
+    anything but an https Vercel Blob URL so a tampered record can't redirect the fetch at
+    file:// or an internal host (SSRF defense)."""
     import librosa
 
-    data = urllib.request.urlopen(url).read()  # noqa: S310 (our own Blob URL)
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "https" or not (parsed.hostname or "").endswith(_BLOB_HOST_SUFFIX):
+        raise ValueError(f"refusing non-Blob audio url: {url!r}")
+    data = urllib.request.urlopen(url, timeout=30).read()  # noqa: S310 (validated Blob URL)
     with tempfile.NamedTemporaryFile(suffix=f".{ext}", delete=True) as tmp:
         tmp.write(data)
         tmp.flush()
@@ -75,7 +85,7 @@ def _decode_audio(url: str, ext: str) -> np.ndarray:
 def _fetch_records(base_url: str, admin_token: str) -> list[dict]:
     url = base_url.rstrip("/") + "/api/contributions"
     req = urllib.request.Request(url, headers={"Authorization": f"Bearer {admin_token}"})
-    with urllib.request.urlopen(req) as resp:  # noqa: S310 (configured admin endpoint)
+    with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310 (configured admin endpoint)
         payload = json.loads(resp.read())
     return payload.get("contributions", [])
 
@@ -120,6 +130,8 @@ def main() -> None:
         ap.error("set --base-url/--admin-token or CONTRIB_API_URL/CONTRIB_ADMIN_TOKEN")
 
     out: Path = args.out
+    if out.name == "verified":  # never write unverified pseudo-labels into a trusted split
+        ap.error(f"refusing to pull into {out} — that's a verified split; use a quarantine dir")
     (out / "audio").mkdir(parents=True, exist_ok=True)
     (out / "programs").mkdir(parents=True, exist_ok=True)
 
@@ -201,7 +213,9 @@ def main() -> None:
 
     print(
         f"pulled {len(new_samples)} new contribution(s) "
-        f"(skipped {skipped} invalid, {len(ledger)} total in ledger) -> {out}"
+        f"(skipped {skipped} invalid, {len(ledger)} total in ledger) -> {out}\n"
+        "  NOTE: UNVERIFIED Gemini pseudo-labels — hardware-verify (training.data.verify_contrib "
+        "or the daemon) before trusting them; finetune --contrib mixes them in down-weighted."
     )
 
 

@@ -20,6 +20,7 @@ import onnxruntime as ort
 from onnx import TensorProto, helper, numpy_helper
 
 from training import schema
+from training.runtime import atomic_write_bytes
 
 _REPO = Path(__file__).resolve().parent.parent
 _OUT = _REPO / "web" / "public" / "models" / "model.onnx"
@@ -85,10 +86,13 @@ def build_real(checkpoint: Path) -> None:
     model.eval()
     sample = torch.zeros(schema.INPUT_SHAPE, dtype=torch.float32)
     _OUT.parent.mkdir(parents=True, exist_ok=True)
+    # Export to a temp path then rename, so the browser (or a self-check) never reads a
+    # half-written model — e.g. a retrain re-exporting while the app fetches it.
+    tmp = _OUT.with_name(_OUT.name + ".tmp")
     torch.onnx.export(
         model,
         sample,
-        str(_OUT),
+        str(tmp),
         input_names=[schema.INPUT_NAME],
         output_names=list(schema.OUTPUT_NAMES),
         opset_version=_OPSET,
@@ -96,6 +100,7 @@ def build_real(checkpoint: Path) -> None:
         # torch 2.9 flips the default to the dynamo exporter; don't let that change silently.
         dynamo=False,
     )
+    tmp.replace(_OUT)
 
 
 def self_check() -> None:
@@ -121,7 +126,7 @@ def main() -> None:
 
     _OUT.parent.mkdir(parents=True, exist_ok=True)
     if args.dummy:
-        onnx.save(build_dummy(), str(_OUT))
+        atomic_write_bytes(_OUT, build_dummy().SerializeToString())
     else:
         build_real(args.checkpoint)
     self_check()

@@ -15,6 +15,7 @@ export interface ContributionInput {
   model: string
   engine: Engine
   rating: Rating
+  turnstileToken?: string | undefined
 }
 
 export async function submitContribution(
@@ -35,6 +36,8 @@ export async function submitContribution(
       schemaVersion: SCHEMA_VERSION,
     }),
   )
+
+  if (input.turnstileToken) form.append('turnstileToken', input.turnstileToken)
 
   const res = await fetch('/api/contribute', { method: 'POST', body: form })
   if (!res.ok) {

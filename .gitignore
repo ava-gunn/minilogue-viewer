@@ -4,6 +4,10 @@ dist-ssr
 *.local
 .DS_Store
 
+# secrets / local env (CONTRIB_ADMIN_TOKEN, blob/KV/turnstile keys)
+.env
+.env.*
+
 # test artifacts
 test-results
 playwright-report

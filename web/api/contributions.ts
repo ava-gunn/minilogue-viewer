@@ -3,6 +3,7 @@
 // audioUrl); the Blob token stays server-side. Gate with the CONTRIB_ADMIN_TOKEN env var:
 //   Authorization: Bearer <CONTRIB_ADMIN_TOKEN>
 
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { list } from '@vercel/blob'
 
 // Node.js runtime (the default): @vercel/blob needs Node modules the Edge runtime lacks.
@@ -14,13 +15,23 @@ function json(body: unknown, status: number): Response {
   })
 }
 
+/** Constant-time compare: hash both sides to equal-length digests so timingSafeEqual can't
+ *  throw on length and response time doesn't leak how many bytes of the token matched. */
+function safeEqual(a: string, b: string): boolean {
+  return timingSafeEqual(
+    createHash('sha256').update(a).digest(),
+    createHash('sha256').update(b).digest(),
+  )
+}
+
 export async function GET(req: Request): Promise<Response> {
   const token = process.env.BLOB_READ_WRITE_TOKEN
   const admin = process.env.CONTRIB_ADMIN_TOKEN
   if (!token || !admin) return json({ error: 'storage not configured' }, 500)
 
   const auth = req.headers.get('authorization') ?? ''
-  if (auth !== `Bearer ${admin}`) return json({ error: 'unauthorized' }, 401)
+  if (!safeEqual(auth, `Bearer ${admin}`))
+    return json({ error: 'unauthorized' }, 401)
 
   const records: unknown[] = []
   let cursor: string | undefined

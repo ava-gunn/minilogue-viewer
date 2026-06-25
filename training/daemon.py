@@ -26,11 +26,13 @@ import argparse
 import base64
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
 import tempfile
 import threading
+import traceback
 import wave
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -60,21 +62,25 @@ class State:
             midi_port=args.midi_out, midi_in=args.midi_in, audio_device=args.audio,
             sample_rate=schema.AUDIO["sample_rate"],
         )
-        self.verified = args.verified
-        (self.verified / "audio").mkdir(parents=True, exist_ok=True)
-        if not (self.verified / "meta.json").exists():
-            _write_meta(self.verified)
-        self.total = _count(self.verified)
-        self.new_since_tune = 0
-        self.tuning = False
-        self.stop = threading.Event()  # set on shutdown -> poll loop exits
-        self.remote_verified = 0
-        self.ledger_path = self.verified / ".remote_pulled"
-        self.remote_ledger: set[str] = (
-            set(json.loads(self.ledger_path.read_text())) if self.ledger_path.exists() else set()
-        )
-        self._wake = keep_awake()
-        self._wake.__enter__()
+        try:  # if any setup below fails, don't leak the just-opened MIDI/audio ports
+            self.verified = args.verified
+            (self.verified / "audio").mkdir(parents=True, exist_ok=True)
+            if not (self.verified / "meta.json").exists():
+                _write_meta(self.verified)
+            self.total = _count(self.verified)
+            self.new_since_tune = 0
+            self.tuning = False
+            self.stop = threading.Event()  # set on shutdown -> poll loop exits
+            self.remote_verified = 0
+            self.ledger_path = self.verified / ".remote_pulled"
+            self.remote_ledger: set[str] = (
+                set(json.loads(self.ledger_path.read_text())) if self.ledger_path.exists() else set()
+            )
+            self._wake = keep_awake()
+            self._wake.__enter__()
+        except BaseException:
+            self.xd.close()
+            raise
 
     def save_ledger(self) -> None:
         self.ledger_path.write_text(json.dumps(sorted(self.remote_ledger)))
@@ -147,6 +153,7 @@ def _verify_signal(
         status = "verified" if mel_l1 <= FLOOR * 2 else ("rejected" if mel_l1 >= REJECT else "review")
 
         promoted = status != "rejected"
+        should_tune = False
         if promoted:
             sid = state.total
             _write_wav(state.verified / "audio" / f"{sid:06d}.wav", source)
@@ -163,9 +170,16 @@ def _verify_signal(
             (state.verified / "mels.npy").unlink(missing_ok=True)
             state.total += 1
             state.new_since_tune += 1
+            # Decide-and-claim the tune atomically under the same lock, so two promoters
+            # (the HTTP handler + the remote poll thread) can't both launch a retrain or
+            # lose a count between the check and the reset.
+            if not state.tuning and state.new_since_tune >= state.args.tune_after:
+                state.tuning = True
+                state.new_since_tune = 0
+                should_tune = True
 
-    if promoted:
-        _maybe_tune(state)
+    if should_tune:
+        threading.Thread(target=_tune, args=(state,), daemon=True).start()
     return {
         "status": status,
         "mel_l1": round(mel_l1, 3),
@@ -217,7 +231,11 @@ def _pull_remote(state: State) -> None:
             continue
         try:
             source = _download_audio(rec["audioUrl"], rec.get("audioExt", "wav"))
-        except Exception as e:  # transient — leave unmarked so it retries
+        except ValueError as e:  # bad/non-Blob url -> permanent, mark handled
+            print(f"[remote] {cid[:8]} bad audio url ({e}) — skipping", flush=True)
+            state.remote_ledger.add(cid)
+            continue
+        except Exception as e:  # transient (network/timeout) -> leave unmarked, retry next poll
             print(f"[remote] {cid[:8]} download failed: {e} — will retry", flush=True)
             continue
         engine = rec.get("engine") or "unknown"
@@ -250,21 +268,23 @@ def _poll_loop(state: State) -> None:
             break
 
 
-def _maybe_tune(state: State) -> None:
-    if state.tuning or state.new_since_tune < state.args.tune_after:
-        return
-    state.tuning = True
-    state.new_since_tune = 0
-    threading.Thread(target=_tune, args=(state,), daemon=True).start()
-
-
 def _tune(state: State) -> None:
     env = {**os.environ, "PYTHONPATH": str(_REPO)}
+    snap = None
     try:
-        print(f"[tune] retraining on {state.total} verified samples…", flush=True)
+        # Snapshot the verified split under the lock so the subprocess trains on a consistent
+        # set while the daemon keeps appending live verifies — otherwise the tuner can read a
+        # torn jsonl line or build a mels.npy that's shorter than samples.jsonl (silent mismatch).
+        with state.lock:
+            snap = state.verified / ".snapshots" / f"{state.total:06d}"
+            shutil.rmtree(snap, ignore_errors=True)
+            shutil.copytree(
+                state.verified, snap, ignore=shutil.ignore_patterns(".snapshots", "mels.npy")
+            )
+        print(f"[tune] retraining on {_count(snap)} verified samples ({snap.name})…", flush=True)
         subprocess.run(
             [sys.executable, "-m", "training.finetune", "--data", str(state.args.data),
-             "--contrib", str(state.verified), "--init", "transfer",
+             "--contrib", str(snap), "--init", "transfer",
              "--epochs", str(state.args.tune_epochs)],
             cwd=_REPO, env=env, check=True,
         )
@@ -277,15 +297,33 @@ def _tune(state: State) -> None:
     except subprocess.CalledProcessError as e:
         print(f"[tune] failed: {e}", flush=True)
     finally:
+        if snap is not None:
+            shutil.rmtree(snap, ignore_errors=True)
         state.tuning = False
 
 
 def _handler(state: State) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         def _cors(self) -> None:
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            # Echo the allow-origin only for an allowlisted origin (never "*"), so a random
+            # site the user visits can't preflight a cross-origin POST to the local hardware.
+            origin = self.headers.get("Origin")
+            if origin and origin in state.args.allow_origin:
+                self.send_header("Access-Control-Allow-Origin", origin)
+                self.send_header("Vary", "Origin")
+                self.send_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Daemon-Token")
+
+        def _authorized(self) -> bool:
+            """Gate side-effecting requests: reject browser requests from a foreign origin,
+            and (if a token is configured) require it. Requests with no Origin (curl, the
+            local test client) are allowed — the daemon binds to 127.0.0.1 only."""
+            origin = self.headers.get("Origin")
+            if origin is not None and origin not in state.args.allow_origin:
+                return False
+            if state.args.token and self.headers.get("X-Daemon-Token") != state.args.token:
+                return False
+            return True
 
         def _json(self, code: int, body: dict) -> None:
             data = json.dumps(body).encode()
@@ -320,12 +358,16 @@ def _handler(state: State) -> type[BaseHTTPRequestHandler]:
             if self.path.rstrip("/") != "/verify":
                 self._json(404, {"error": "not found"})
                 return
+            if not self._authorized():
+                self._json(403, {"error": "forbidden"})
+                return
             try:
                 length = int(self.headers.get("Content-Length", 0))
                 payload = json.loads(self.rfile.read(length))
                 self._json(200, verify(state, payload))
-            except Exception as e:  # report failures to the browser rather than hang
-                self._json(500, {"error": f"{type(e).__name__}: {e}"})
+            except Exception:  # log detail server-side; don't leak internals to the caller
+                traceback.print_exc()
+                self._json(500, {"error": "verify failed"})
 
     return Handler
 
@@ -350,16 +392,27 @@ def main() -> None:
                     help="admin token for /api/contributions (or CONTRIB_ADMIN_TOKEN)")
     ap.add_argument("--poll-interval", type=int, default=300, help="seconds between remote pulls")
     ap.add_argument("--no-remote", action="store_true", help="disable remote polling")
+    ap.add_argument(
+        "--allow-origin",
+        default="http://localhost:5173,http://127.0.0.1:5173",
+        help="comma-separated browser origins allowed to POST /verify",
+    )
+    ap.add_argument("--token", default=os.environ.get("DAEMON_TOKEN"),
+                    help="if set, require it in the X-Daemon-Token header (or DAEMON_TOKEN env)")
     args = ap.parse_args()
+    args.allow_origin = {o.strip() for o in args.allow_origin.split(",") if o.strip()}
     if args.no_remote:
         args.contrib_url = args.contrib_token = None
 
     state = State(args)
-    cal = state.calibrate()
-    print(f"calibration rms={cal:.4f}", flush=True)
-    if cal < RMS_FLOOR:
+    try:
+        cal = state.calibrate()
+        print(f"calibration rms={cal:.4f}", flush=True)
+        if cal < RMS_FLOOR:
+            raise SystemExit("calibration silent — check XD power/volume + Volt input gain")
+    except BaseException:  # calibration error/abort -> release ports + caffeinate, don't leak
         state.close()
-        raise SystemExit("calibration silent — check XD power/volume + Volt input gain")
+        raise
 
     server = ThreadingHTTPServer(("127.0.0.1", args.port), _handler(state))
 

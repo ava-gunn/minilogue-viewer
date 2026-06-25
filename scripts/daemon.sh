@@ -25,7 +25,11 @@ case "${1:-}" in
     ;;
   stop)
     if is_running; then
-      kill "$(cat "$PIDFILE")"   # SIGTERM -> clean panic + XD reset + close
+      pid="$(cat "$PIDFILE")"
+      kill "$pid"   # SIGTERM -> clean panic + XD reset + close
+      # Wait for it to actually exit (release :8753 + the XD) so an immediate restart
+      # doesn't hit "address already in use".
+      for _ in $(seq 1 50); do kill -0 "$pid" 2>/dev/null || break; sleep 0.2; done
       rm -f "$PIDFILE"
       echo "daemon stopped"
     else

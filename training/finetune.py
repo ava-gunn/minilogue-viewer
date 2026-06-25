@@ -142,7 +142,9 @@ def main() -> None:
         flag = ""
         if m["loss"] < best and args.init == "transfer":
             best = m["loss"]
-            torch.save(model.state_dict(), args.out)
+            tmp = args.out.with_name(args.out.name + ".tmp")
+            torch.save(model.state_dict(), tmp)
+            tmp.replace(args.out)  # atomic: never leave a half-written checkpoint
             flag = "  *saved"
         if epoch == 1 or epoch % 10 == 0 or epoch == args.epochs:
             print(

@@ -22,6 +22,12 @@ import {
 } from '../services/contribute'
 import { analyzeAudio, MODELS } from '../services/gemini'
 import { connectMidi, type MidiController } from '../services/midi'
+import {
+  mountTurnstile,
+  resetTurnstile,
+  turnstileEnabled,
+  turnstileToken,
+} from '../services/turnstile'
 import { isLocalhost, verifyOnHardware } from '../services/verify'
 import { initMidiStatus } from './midi-status'
 
@@ -79,6 +85,7 @@ export function initResynth(): void {
   const pitchSel = byId<HTMLSelectElement>('resynth-pitch')
   const upBtn = byId<HTMLButtonElement>('resynth-up')
   const downBtn = byId<HTMLButtonElement>('resynth-down')
+  const turnstileBox = byId('resynth-turnstile')
 
   const setStatus = (msg: string): void => {
     if (status) status.textContent = msg
@@ -136,13 +143,15 @@ export function initResynth(): void {
     ctx.clearRect(0, 0, width, height)
     const mid = height / 2
     let data: Float32Array | undefined
+    let ac: AudioContext | undefined
     try {
-      const ac = new AudioContext()
+      ac = new AudioContext()
       const buf = await ac.decodeAudioData(await f.arrayBuffer())
       data = buf.getChannelData(0)
-      void ac.close()
     } catch {
       // Undecodable here (Gemini may still accept it) — show a flat baseline.
+    } finally {
+      void ac?.close() // close on every path so bad files don't exhaust AudioContexts
     }
     ctx.fillStyle =
       getComputedStyle(canvas).getPropertyValue('color').trim() || '#2dd4bf'
@@ -269,6 +278,9 @@ export function initResynth(): void {
           'Patch loaded — try it on your minilogue xd, then rate it.'
       }
       feedback?.removeAttribute('hidden')
+      // Remote submits need a captcha solve; mount the widget once feedback is shown
+      // (skipped on localhost, which uses the hardware daemon instead).
+      if (!isLocalhost() && turnstileBox) void mountTurnstile(turnstileBox)
       setStep('try')
       setStatus('Done.')
       updateLoad()
@@ -328,6 +340,13 @@ export function initResynth(): void {
       return
     }
 
+    const tsToken = turnstileToken()
+    if (turnstileEnabled() && !tsToken) {
+      setStatus('Please complete the verification challenge first.')
+      if (upBtn) upBtn.disabled = false
+      if (downBtn) downBtn.disabled = false
+      return
+    }
     setStatus('Sending feedback…')
     try {
       const id = await submitContribution({
@@ -338,7 +357,9 @@ export function initResynth(): void {
         model: getModel(),
         engine: engine(),
         rating,
+        turnstileToken: tsToken,
       })
+      resetTurnstile()
       setStep('feedback')
       stepEls
         .find((li) => li.dataset.step === 'feedback')

@@ -5,7 +5,7 @@
 // CPU/wasm-only build (no WebGPU/JSEP). Its glue is bundled, so only the .wasm binary
 // is fetched at runtime — see vite.config.ts (optimizeDeps.exclude keeps it inlined).
 import * as ort from 'onnxruntime-web/wasm'
-import { INPUT_NAME, N_FRAMES, N_MELS } from './contract'
+import { INPUT_NAME, N_FRAMES, N_MELS, OUTPUT_NAMES } from './contract'
 
 ort.env.wasm.wasmPaths = `${import.meta.env.BASE_URL}ort/`
 ort.env.wasm.numThreads = 1
@@ -32,6 +32,13 @@ export async function runModel(mel: Float32Array): Promise<RawOutputs> {
   const session = await load()
   const input = new ort.Tensor('float32', mel, [1, 1, N_MELS, N_FRAMES])
   const results = await session.run({ [INPUT_NAME]: input })
+  for (const name of OUTPUT_NAMES) {
+    if (!results[name]) {
+      throw new Error(
+        `model output "${name}" missing (have: ${Object.keys(results).join(', ')}) — wrong model?`,
+      )
+    }
+  }
   return {
     continuous: results.continuous.data as Float32Array,
     discrete: results.discrete.data as Float32Array,

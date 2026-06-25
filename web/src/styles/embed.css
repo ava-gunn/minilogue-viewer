@@ -1,0 +1,12 @@
+/* Ableton embed header — loaded only by embed.ts, so these rules never affect the viewer
+   or resynth pages. Reuses .midi-bar for layout; pushes the Resynthesis link to the right. */
+.embed-title {
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--wa-color-text-normal, #e0e0e6);
+}
+
+.midi-bar .resynth-link {
+  margin-inline-start: auto;
+}

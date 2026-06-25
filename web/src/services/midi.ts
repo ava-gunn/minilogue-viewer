@@ -28,6 +28,8 @@ export interface MidiController {
   /** Load a 1024-byte prog_bin into the synth's edit buffer. Returns false if no
       output port is available. */
   sendProgram: (prog: Uint8Array) => boolean
+  /** Stop the background poll + any pending refresh and release timers. */
+  dispose: () => void
 }
 
 const DEVICE_RE = /minilogue\s*xd/i
@@ -196,10 +198,15 @@ export async function connectMidi(
 
   // Poll the current program so SysEx-only params (voice mode) track the synth,
   // which doesn't transmit them as CC. No-ops when no device is connected.
-  setInterval(() => {
+  const pollInterval = setInterval(() => {
     pendingMode = 'poll'
     sendRequest()
   }, 1500)
 
-  return { refresh, sendProgram }
+  function dispose(): void {
+    clearInterval(pollInterval)
+    if (refreshTimer) clearTimeout(refreshTimer)
+  }
+
+  return { refresh, sendProgram, dispose }
 }

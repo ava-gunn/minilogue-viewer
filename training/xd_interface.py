@@ -29,9 +29,17 @@ class XdInterface:
     ) -> None:
         self.sr = sample_rate
         self.channel = channel
-        self._out = mido.open_output(midi_port)
-        self._in = mido.open_input(midi_in)  # kept open; reopening per-read drops replies
-        self._dev = self._find_input(audio_device)
+        self._out = self._in = None
+        try:
+            self._out = mido.open_output(midi_port)
+            self._in = mido.open_input(midi_in)  # kept open; reopening per-read drops replies
+            self._dev = self._find_input(audio_device)
+        except BaseException:  # don't leak a half-open port if a later open/lookup fails
+            if self._out is not None:
+                self._out.close()
+            if self._in is not None:
+                self._in.close()
+            raise
 
     @staticmethod
     def _find_input(name: str) -> int:

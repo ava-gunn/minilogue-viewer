@@ -35,9 +35,14 @@ export async function verifyOnHardware(opts: {
   pitchMidi: number
   engine: Engine
 }): Promise<VerifyResult> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  // Optional shared token — set VITE_DAEMON_TOKEN to match the daemon's --token/DAEMON_TOKEN.
+  const token = (import.meta.env as Record<string, string | undefined>)
+    .VITE_DAEMON_TOKEN
+  if (token) headers['X-Daemon-Token'] = token
   const res = await fetch(`${DAEMON}/verify`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({
       audio: await toBase64(opts.file),
       ext: opts.file.name.split('.').pop()?.toLowerCase() || 'wav',

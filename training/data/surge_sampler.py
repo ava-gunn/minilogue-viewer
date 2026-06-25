@@ -86,7 +86,10 @@ def _set_discrete(param, label: str) -> None:
         param.raw_value = param.get_raw_value_for(label)
     except Exception:
         values = list(param.valid_values)
-        param.raw_value = values.index(label) / max(len(values) - 1, 1)
+        if label in values:  # else leave the param default rather than abort the whole run
+            param.raw_value = values.index(label) / max(len(values) - 1, 1)
+        else:
+            print(f"warning: {label!r} invalid for this param; left at default")
 
 
 def matched_params(instrument) -> list[str]:
