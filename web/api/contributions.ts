@@ -5,7 +5,7 @@
 
 import { list } from '@vercel/blob'
 
-export const config = { runtime: 'edge' }
+// Node.js runtime (the default): @vercel/blob needs Node modules the Edge runtime lacks.
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
@@ -14,9 +14,7 @@ function json(body: unknown, status: number): Response {
   })
 }
 
-export default async function handler(req: Request): Promise<Response> {
-  if (req.method !== 'GET') return json({ error: 'method not allowed' }, 405)
-
+export async function GET(req: Request): Promise<Response> {
   const token = process.env.BLOB_READ_WRITE_TOKEN
   const admin = process.env.CONTRIB_ADMIN_TOKEN
   if (!token || !admin) return json({ error: 'storage not configured' }, 500)

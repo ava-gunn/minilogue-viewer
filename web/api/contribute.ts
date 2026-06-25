@@ -6,9 +6,11 @@
 // Audio clips are tiny (a 1s mono WAV is ~90 KB), well under Vercel's request body limit.
 // No Gemini key reaches the server — inference is browser-direct with the user's own key.
 
+import { randomUUID } from 'node:crypto'
 import { put } from '@vercel/blob'
 
-export const config = { runtime: 'edge' }
+// Node.js runtime (the default): @vercel/blob depends on Node stream/undici modules that
+// the Edge runtime can't provide. The Web Request/Response handler signature works here too.
 
 // Reject obviously-wrong payloads early. The full param count is enforced loosely here and
 // strictly when the record is materialized by the Python puller.
@@ -22,9 +24,7 @@ function json(body: unknown, status: number): Response {
   })
 }
 
-export default async function handler(req: Request): Promise<Response> {
-  if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405)
-
+export async function POST(req: Request): Promise<Response> {
   const token = process.env.BLOB_READ_WRITE_TOKEN
   if (!token) return json({ error: 'storage not configured' }, 500)
 
@@ -64,7 +64,7 @@ export default async function handler(req: Request): Promise<Response> {
     return json({ error: 'meta.pitchMidi is required' }, 400)
   }
 
-  const id = crypto.randomUUID()
+  const id = randomUUID()
   const ext = (audio.name.split('.').pop() || 'wav').toLowerCase()
 
   const stored = await put(`contributions/${id}/audio.${ext}`, audio, {
