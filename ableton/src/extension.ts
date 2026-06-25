@@ -50,11 +50,10 @@ export function activate(activation: ActivationContext) {
     }
   })
 
-  // Empty title: Live prepends the manifest name, so the menu entry reads just
-  // "minilogue xd viewer" (a title here would render as "minilogue xd viewer: <title>").
+  // Live prepends the manifest name, so this renders as "minilogue xd viewer: open".
   for (const scope of SCOPES) {
     context.ui
-      .registerContextMenuAction(scope, "", VIEWER_ID)
+      .registerContextMenuAction(scope, "open", VIEWER_ID)
       .catch((err) =>
         console.error("[minilogue-xd-viewer] failed to register", scope, err),
       )
