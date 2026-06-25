@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { PARAM_SPEC } from '../parser/param-spec'
 import {
   ANALYSIS_FIELDS,
-  buildResponseSchema,
+  buildAnalysisSchema,
+  buildProgramSchema,
   PARAM_GLOSSARY,
   programToRawById,
 } from './schema'
 
-describe('buildResponseSchema', () => {
-  const schema = buildResponseSchema()
+describe('buildProgramSchema', () => {
+  const schema = buildProgramSchema()
   const program = schema.properties?.program
 
   it('has one program property per param, in spec order, all required', () => {
@@ -16,18 +17,6 @@ describe('buildResponseSchema', () => {
     expect(Object.keys(program?.properties ?? {})).toEqual(ids)
     expect(program?.propertyOrdering).toEqual(ids)
     expect(program?.required).toEqual(ids)
-  })
-
-  it('includes a structured analysis object, emitted before the program', () => {
-    const analysis = schema.properties?.analysis
-    expect(analysis?.type).toBe('OBJECT')
-    expect(Object.keys(analysis?.properties ?? {})).toEqual(
-      Object.keys(ANALYSIS_FIELDS),
-    )
-    expect(analysis?.required).toEqual(Object.keys(ANALYSIS_FIELDS))
-    const order = schema.propertyOrdering ?? []
-    expect(order.indexOf('analysis')).toBeLessThan(order.indexOf('program'))
-    expect(schema.required).toContain('analysis')
   })
 
   it('types each param: continuous=NUMBER, discrete=STRING enum / INTEGER, boolean=BOOLEAN', () => {
@@ -38,6 +27,19 @@ describe('buildResponseSchema', () => {
     expect(props.vco1_wave?.enum).toEqual(['SQR', 'TRI', 'SAW'])
     // octave has a cardinality but no value labels -> INTEGER
     expect(props.octave?.type).toBe('INTEGER')
+  })
+})
+
+describe('buildAnalysisSchema', () => {
+  it('is a flat object with one required string field per analysis trait', () => {
+    const schema = buildAnalysisSchema()
+    expect(schema.type).toBe('OBJECT')
+    expect(Object.keys(schema.properties ?? {})).toEqual(
+      Object.keys(ANALYSIS_FIELDS),
+    )
+    expect(schema.propertyOrdering).toEqual(Object.keys(ANALYSIS_FIELDS))
+    expect(schema.required).toEqual(Object.keys(ANALYSIS_FIELDS))
+    expect(schema.properties?.sound_type?.type).toBe('STRING')
   })
 })
 

@@ -320,6 +320,7 @@ export function initResynth(): void {
           model: getModel(),
           waveformPng: waveformPng(),
           durationSec: waveformDuration || undefined,
+          onProgress: setStatus,
         })
         rawById = program.rawById
         name = program.name

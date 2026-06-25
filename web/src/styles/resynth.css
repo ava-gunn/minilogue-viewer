@@ -133,6 +133,10 @@
   gap: 0.35rem;
   cursor: pointer;
 }
+.resynth-engine label:has(input:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 .resynth-creds {
   display: flex;
@@ -178,7 +182,8 @@
   flex: 1 1 12rem;
   font-size: 0.72rem;
   line-height: 1.5;
-  opacity: 0.65;
+  /* Dim via a muted colour, not opacity — group opacity dragged the API-key link below AA. */
+  color: var(--wa-color-neutral-on-quiet, #b4b4bc);
 }
 
 .resynth-note a {

@@ -8,7 +8,7 @@ import { PARAM_SPEC } from '../parser/param-spec'
 
 // Bump when the prompt or the schema mapping changes, so submissions carry provenance and
 // stale-prompt data is filterable downstream.
-export const PROMPT_VERSION = 'gemini-resynth-v2'
+export const PROMPT_VERSION = 'gemini-resynth-v3'
 export const SCHEMA_VERSION = 'xd-params-52-v1'
 
 /** Minimal JSON-schema subset accepted by @google/genai's responseSchema. */
@@ -128,35 +128,37 @@ function paramSchema(id: string): GeminiSchema {
   }
 }
 
-/** The responseSchema handed to Gemini: a structured `analysis` of the source audio (emitted
- *  first so it conditions the parameter choices), the `program` (one property per param id in
- *  spec order), and a short name + rationale for the UI. */
-export function buildResponseSchema(): GeminiSchema {
+/** Pass-1 responseSchema: the structured audio analysis ONLY. Kept free of the 52-param program
+ *  and the param glossary so the model's whole job in that call is to LISTEN and describe the
+ *  source — sharing the call with patch generation pulled it into "design a patch" mode and the
+ *  analysis suffered. */
+export function buildAnalysisSchema(): GeminiSchema {
+  const properties: Record<string, GeminiSchema> = {}
+  const ordering: string[] = []
+  for (const [id, description] of Object.entries(ANALYSIS_FIELDS)) {
+    properties[id] = { type: 'STRING', description }
+    ordering.push(id)
+  }
+  return {
+    type: 'OBJECT',
+    properties,
+    propertyOrdering: ordering,
+    required: ordering,
+  }
+}
+
+/** Pass-2 responseSchema: the `program` (one property per param id in spec order) plus a short
+ *  name and rationale, designed from the pass-1 analysis. */
+export function buildProgramSchema(): GeminiSchema {
   const properties: Record<string, GeminiSchema> = {}
   const ordering: string[] = []
   for (const p of PARAM_SPEC) {
     properties[p.id] = paramSchema(p.id)
     ordering.push(p.id)
   }
-
-  const analysisProps: Record<string, GeminiSchema> = {}
-  const analysisOrder: string[] = []
-  for (const [id, description] of Object.entries(ANALYSIS_FIELDS)) {
-    analysisProps[id] = { type: 'STRING', description }
-    analysisOrder.push(id)
-  }
-
   return {
     type: 'OBJECT',
     properties: {
-      analysis: {
-        type: 'OBJECT',
-        description:
-          'rigorous analysis of the SOURCE audio — fill this first, then choose program params consistent with it',
-        properties: analysisProps,
-        propertyOrdering: analysisOrder,
-        required: analysisOrder,
-      },
       program: {
         type: 'OBJECT',
         properties,
@@ -170,9 +172,8 @@ export function buildResponseSchema(): GeminiSchema {
           'one or two sentences mapping the analysis to the chosen minilogue xd parameters',
       },
     },
-    // analysis -> program -> name -> rationale: analyse first, then build, then summarise.
-    propertyOrdering: ['analysis', 'program', 'name', 'rationale'],
-    required: ['analysis', 'program'],
+    propertyOrdering: ['program', 'name', 'rationale'],
+    required: ['program'],
   }
 }
 
