@@ -4,9 +4,13 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:embed": "vite build --config vite.embed.config.ts",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -29,11 +33,12 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.1",
     "@playwright/test": "^1.61.1",
-    "@types/node": "^22.20.0",
+    "@types/node": "^24.0.0",
     "jsdom": "^29.1.1",
     "tsx": "^4.19.0",
     "typescript": "^6.0.3",
     "vite": "^8.1.0",
+    "vite-plugin-singlefile": "^2.3.3",
     "vitest": "^4.1.9"
   }
 }

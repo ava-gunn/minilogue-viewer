@@ -1,0 +1,36 @@
+name: Ableton Release
+
+on:
+  push:
+    tags: ["ableton-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ableton/.nvmrc
+
+      - run: corepack enable
+
+      # Install the web deps so the extension build can produce the offline viewer
+      # (ableton/build.ts runs `pnpm build:embed` in ../web and inlines the result).
+      - run: corepack pnpm -C web install --frozen-lockfile
+
+      - run: npm --prefix ableton ci
+
+      - run: npm --prefix ableton run package
+
+      - name: Stamp artifact with version
+        run: cp ableton/dist/minilogue-xd-viewer.ablx "minilogue-xd-viewer-${GITHUB_REF_NAME}.ablx"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: minilogue-xd-viewer-*.ablx
+          generate_release_notes: true

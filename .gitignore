@@ -1,5 +1,6 @@
 node_modules
 dist
+dist-embed
 dist-ssr
 *.local
 .DS_Store
@@ -7,6 +8,7 @@ dist-ssr
 # secrets / local env (CONTRIB_ADMIN_TOKEN, blob/KV/turnstile keys)
 .env
 .env.*
+!.env.example
 
 # test artifacts
 test-results

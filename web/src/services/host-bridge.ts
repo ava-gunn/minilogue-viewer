@@ -13,7 +13,7 @@ interface HostBridge {
 // with no origin of its own.
 const RESYNTH_URL =
   import.meta.env.VITE_RESYNTH_URL ||
-  'https://minilogue-viewer.vercel.app/resynth.html'
+  'https://minilogue-xd-viewer.vercel.app/resynth.html'
 
 function host(): HostBridge | undefined {
   const w = window as unknown as {
@@ -39,7 +39,9 @@ export function openExternal(url: string): void {
 /** Wire the Resynthesis link to open the deployed app externally instead of navigating. */
 export function initEmbedLink(): void {
   const link = document.querySelector<HTMLAnchorElement>('.resynth-link')
-  link?.addEventListener('click', (e) => {
+  if (!link) return
+  link.href = RESYNTH_URL // reflect the configured URL (overridable at build time)
+  link.addEventListener('click', (e) => {
     e.preventDefault()
     openExternal(RESYNTH_URL)
   })
