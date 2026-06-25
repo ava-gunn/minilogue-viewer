@@ -26,31 +26,51 @@ for _card in schema.DISCRETE_CARDINALITIES:
 
 Pred = tuple[torch.Tensor, torch.Tensor, torch.Tensor]
 Target = tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+Masks = tuple[torch.Tensor, torch.Tensor, torch.Tensor]
 
 
 def multihead_loss(
     pred: Pred,
     target: Target,
     weights: tuple[float, float, float] = (1.0, 1.0, 1.0),
+    masks: Masks | None = None,
 ) -> tuple[torch.Tensor, dict[str, float]]:
     """pred = (continuous [B,n_cont] in [0,1], discrete [B,total_discrete] logits,
     boolean [B,n_bool] in [0,1]); target = (continuous [B,n_cont] float,
-    discrete [B,n_discrete] long class indices, boolean [B,n_bool] float)."""
+    discrete [B,n_discrete] long class indices, boolean [B,n_bool] float).
+
+    masks (optional) = per-param audibility weights (cont_w, disc_w, bool_w); when given,
+    each head becomes a weight-normalized average so inaudible params don't dominate."""
     cont_p, disc_p, bool_p = pred
     cont_t, disc_t, bool_t = target
     w_c, w_d, w_b = weights
+    cont_w, disc_w, bool_w = (None, None, None) if masks is None else masks
 
-    cont_loss = F.l1_loss(cont_p, cont_t)
+    if cont_w is None:
+        cont_loss = F.l1_loss(cont_p, cont_t)
+    else:
+        cont_loss = (cont_w * (cont_p - cont_t).abs()).sum() / cont_w.sum()
 
-    disc_loss = cont_p.new_zeros(())
+    disc_num = cont_p.new_zeros(())
+    disc_den = cont_p.new_zeros(())
     for group, (off, card) in enumerate(_DISCRETE_SLICES):
-        disc_loss = disc_loss + F.cross_entropy(
-            disc_p[:, off : off + card], disc_t[:, group]
+        ce = F.cross_entropy(
+            disc_p[:, off : off + card],
+            disc_t[:, group],
+            reduction="mean" if disc_w is None else "none",
         )
-    if _DISCRETE_SLICES:
-        disc_loss = disc_loss / len(_DISCRETE_SLICES)
+        if disc_w is None:
+            disc_num = disc_num + ce
+        else:
+            disc_num = disc_num + (disc_w[:, group] * ce).sum()
+            disc_den = disc_den + disc_w[:, group].sum()
+    disc_loss = disc_num / (len(_DISCRETE_SLICES) if disc_w is None else disc_den)
 
-    bool_loss = F.binary_cross_entropy(bool_p, bool_t)
+    if bool_w is None:
+        bool_loss = F.binary_cross_entropy(bool_p, bool_t)
+    else:
+        bce = F.binary_cross_entropy(bool_p, bool_t, reduction="none")
+        bool_loss = (bool_w * bce).sum() / bool_w.sum()
 
     total = w_c * cont_loss + w_d * disc_loss + w_b * bool_loss
     parts = {

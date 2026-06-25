@@ -18,6 +18,18 @@ from training import schema
 
 _VOICE_MODE_POLY = 0
 
+# Audible biasing: sample these continuous params from a sub-range (fraction of raw_max)
+# so random patches reliably make sound and their oscillators are on — which makes their
+# params identifiable from the audio. Levels/cutoff get a floor; amp attack gets a cap so
+# the note isn't still ramping when the window ends.
+_BIAS: dict[str, tuple[float, float]] = {
+    "mixer_vco1": (0.15, 1.0),
+    "mixer_vco2": (0.15, 1.0),
+    "mixer_multi": (0.15, 1.0),
+    "cutoff": (0.15, 1.0),
+    "amp_attack": (0.0, 0.7),
+}
+
 
 def _write_raw(buf: bytearray, offset: int, width: int, value: int) -> None:
     if width == 8:
@@ -35,20 +47,30 @@ def _targets(raw_by_id: dict[str, int]) -> dict:
     }
 
 
+def write_params(template: bytes, raw_by_id: dict[str, int]) -> bytes:
+    """Overwrite a valid template prog_bin's param-region bytes with raw values (by param
+    id), leaving structure/header/sequence intact. Inverse of the TS parser's raw
+    extraction; used by randomize() and by the eval harness to realize a predicted patch."""
+    buf = bytearray(template)
+    for p in schema.PARAMS:
+        if p["id"] in raw_by_id:
+            _write_raw(buf, p["byte_offset"], p["bit_width"], raw_by_id[p["id"]])
+    return bytes(buf)
+
+
 def randomize(template: bytes, rng: np.random.Generator) -> tuple[bytes, dict]:
     """Return (randomized prog_bin, target vectors). Starts from a valid template and
     overwrites only the param-region bytes, so structure/header/sequence stay intact."""
-    buf = bytearray(template)
     raw_by_id: dict[str, int] = {}
     for p in schema.PARAMS:
         if p["id"] == "voice_mode":
             value = _VOICE_MODE_POLY
         elif p["type"] == "continuous":
-            value = int(rng.integers(0, p["raw_max"] + 1))
+            lo_f, hi_f = _BIAS.get(p["id"], (0.0, 1.0))
+            value = int(rng.integers(int(lo_f * p["raw_max"]), int(hi_f * p["raw_max"]) + 1))
         elif p["type"] == "discrete":
             value = int(rng.integers(0, p["cardinality"]))
         else:  # boolean
             value = int(rng.integers(0, 2))
-        _write_raw(buf, p["byte_offset"], p["bit_width"], value)
         raw_by_id[p["id"]] = value
-    return bytes(buf), _targets(raw_by_id)
+    return write_params(template, raw_by_id), _targets(raw_by_id)

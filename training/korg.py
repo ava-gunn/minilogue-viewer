@@ -76,3 +76,13 @@ def extract_prog_bins(path: Path) -> list[bytes]:
     with zipfile.ZipFile(path) as z:
         names = sorted(n for n in z.namelist() if n.endswith(".prog_bin"))
         return [z.read(n) for n in names]
+
+
+def write_mnlgxdprog(template_path: Path, prog_bin: bytes, out_path: Path) -> None:
+    """Write a loadable .mnlgxdprog by cloning a template archive and swapping in prog_bin
+    (the other entries — FileInformation.xml etc. — are copied through unchanged)."""
+    with zipfile.ZipFile(template_path) as zin:
+        items = [(n, zin.read(n)) for n in zin.namelist()]
+    with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as zout:
+        for name, data in items:
+            zout.writestr(name, prog_bin if name.endswith(".prog_bin") else data)

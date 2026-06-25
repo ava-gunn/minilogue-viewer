@@ -40,7 +40,7 @@ def _count_done(out: Path) -> int:
     return sum(1 for _ in jsonl.open()) if jsonl.exists() else 0
 
 
-def _write_meta(out: Path, gate: float, duration: float) -> None:
+def _write_meta(out: Path, gate: float, duration: float, pitches: list[int]) -> None:
     out.joinpath("meta.json").write_text(
         json.dumps(
             {
@@ -50,6 +50,7 @@ def _write_meta(out: Path, gate: float, duration: float) -> None:
                 "sample_rate": schema.AUDIO["sample_rate"],
                 "gate_s": gate,
                 "duration_s": duration,
+                "pitches": pitches,
             }
         )
     )
@@ -70,16 +71,19 @@ def main() -> None:
     ap.add_argument("--midi-in", default="minilogue xd KBD/KNOB")
     ap.add_argument("--audio", default="Volt 276")
     ap.add_argument("--settle", type=float, default=0.1, help="post-dump settle (0.1 for USB)")
+    # Record each patch at several pitches -> pitch-invariant model + more data.
+    ap.add_argument("--pitches", default="36,60,84", help="MIDI notes per patch (e.g. C2,C4,C6)")
     args = ap.parse_args()
 
     # A kill (SIGTERM) should still run the finally below (close -> panic) so a note
     # can't stick; SystemExit unwinds the stack, plain SIGTERM does not.
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
 
+    pitches = [int(p) for p in args.pitches.split(",")]
     out = args.out
     (out / "audio").mkdir(parents=True, exist_ok=True)
     preflight_disk(out, need_gb=1.0)
-    _write_meta(out, args.gate, args.duration)
+    _write_meta(out, args.gate, args.duration, pitches)
     template = korg.extract_prog_bins(args.template)[0]
 
     sr = schema.AUDIO["sample_rate"]
@@ -97,30 +101,38 @@ def main() -> None:
                 "calibration silent — check Korg power/volume + Volt input gain/connection"
             )
 
+        # Resume by render count, aligned to whole patches (drop a partial patch's
+        # renders from a prior crash so labels/ids stay consistent).
         start = _count_done(out)
+        whole = (start // len(pitches)) * len(pitches)
+        if whole != start:
+            lines = (out / "samples.jsonl").read_text().splitlines()[:whole]
+            (out / "samples.jsonl").write_text("\n".join(lines) + ("\n" if lines else ""))
+            start = whole
         if start >= args.n:
-            print(f"already have {start} >= {args.n} samples at {out}")
+            print(f"already have {start} >= {args.n} renders at {out}")
             return
-        print(f"resuming at {start}, target {args.n}")
-        rng = np.random.default_rng(args.seed + start)
+        patches_done = start // len(pitches)
+        print(f"resuming at {start} renders ({patches_done} patches), target {args.n}; pitches {pitches}")
+        rng = np.random.default_rng(args.seed + patches_done)
 
-        kept, attempts = start, 0
+        kept = start
         with keep_awake(), (out / "samples.jsonl").open("a") as manifest:
             while kept < args.n:
-                attempts += 1
                 prog_bin, targets = xd_params.randomize(template, rng)
                 xd.send_patch(prog_bin, settle_s=args.settle)
-                audio = xd.record(gate_s=args.gate, duration_s=args.duration)
-                rms = float(np.sqrt(np.mean(audio**2)))
-                if rms < RMS_FLOOR:
-                    continue
-                _write_wav(out / "audio" / f"{kept:06d}.wav", audio, sr)
-                manifest.write(json.dumps({"id": kept, "rms": rms, **targets}) + "\n")
+                lines = []
+                for pitch in pitches:  # same patch + labels, different note
+                    audio = xd.record(note=pitch, gate_s=args.gate, duration_s=args.duration)
+                    rms = float(np.sqrt(np.mean(audio**2)))
+                    _write_wav(out / "audio" / f"{kept:06d}.wav", audio, sr)
+                    lines.append(json.dumps({"id": kept, "pitch": pitch, "rms": rms, **targets}))
+                    kept += 1
+                manifest.write("\n".join(lines) + "\n")  # whole patch flushed together
                 manifest.flush()
-                kept += 1
-                if kept % 25 == 0:
-                    print(f"{kept}/{args.n} ({attempts} attempts this run)")
-        print(f"done: {kept} samples at {out} ({attempts} attempts this run)")
+                if kept % 30 == 0:
+                    print(f"{kept}/{args.n} renders")
+        print(f"done: {kept} renders at {out}")
     finally:
         # Leave a benign patch loaded so a final high-resonance random patch can't sit
         # there self-oscillating; then panic + close.
