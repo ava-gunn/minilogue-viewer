@@ -26,9 +26,10 @@ export interface GeminiSchema {
 export const PARAM_GLOSSARY: Record<string, string> = {
   octave: 'master octave; 0..4 maps to -2..+2 octaves (2 = center)',
   portamento: 'glide time between notes; 0 = off',
-  voice_mode_depth: 'amount for the active voice mode',
+  voice_mode_depth:
+    'amount for the active voice mode (for UNISON, the detune spread of the stacked voices)',
   voice_mode:
-    'voice assignment; use POLY for a single sustained note (ARP/CHORD/UNISON change the note count)',
+    'voice assignment; default UNISON (stacks all voices on one note for a fuller monophonic sound). Use POLY ONLY when the source is polyphonic (a chord / multiple simultaneous notes); ARP and CHORD are special note-count modes',
   vco1_wave:
     'VCO1 waveform: SQR = hollow/square, TRI = soft/mellow, SAW = bright/buzzy',
   vco1_octave: "VCO1 octave: 0=16' (lowest), 1=8', 2=4', 3=2' (highest)",
@@ -94,7 +95,8 @@ export const PARAM_GLOSSARY: Record<string, string> = {
 export const ANALYSIS_FIELDS: Record<string, string> = {
   sound_type:
     'what kind of sound this is — name the instrument/category, e.g. "synthetic brass/horn (braaam)", "plucked bass", "warm pad", "saw lead", "FM bell", "electric piano", "organ", "noise sweep/riser", "percussion"',
-  pitch: 'fundamental pitch / note you hear, and any glide between notes (→ portamento)',
+  pitch:
+    'fundamental pitch / note(s); whether it is a single note (monophonic → UNISON) or a chord / multiple simultaneous notes (polyphonic → POLY); and any glide between notes (→ portamento)',
   dynamics:
     'amplitude envelope across the note: attack, decay, sustain level, release (→ AMP EG); e.g. "instant attack, no sustain, short release — plucky"',
   brightness:

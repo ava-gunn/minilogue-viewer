@@ -167,7 +167,13 @@ export function initResynth(): void {
   modelSel?.addEventListener('change', () => setModel(modelSel.value))
 
   // ---- audio preview (waveform + audition) ---------------------------------
+  // Whether the canvas holds a real decoded waveform (vs a flat baseline / nothing) — we only
+  // ship the screenshot to Gemini when it's meaningful — plus the clip duration for envelope scaling.
+  let waveformOk = false
+  let waveformDuration = 0
   async function drawWaveform(f: File): Promise<void> {
+    waveformOk = false
+    waveformDuration = 0
     if (!canvas) return
     canvas.setAttribute('aria-label', `Waveform of ${f.name}`)
     const ctx = canvas.getContext('2d')
@@ -181,6 +187,7 @@ export function initResynth(): void {
       ac = new AudioContext()
       const buf = await ac.decodeAudioData(await f.arrayBuffer())
       data = buf.getChannelData(0)
+      waveformDuration = buf.duration
     } catch {
       // Undecodable here (Gemini may still accept it) — show a flat baseline.
     } finally {
@@ -202,6 +209,19 @@ export function initResynth(): void {
         if (v > max) max = v
       }
       ctx.fillRect(x, mid + min * mid, 1, Math.max(1, (max - min) * mid))
+    }
+    waveformOk = true
+  }
+
+  // Snapshot the rendered waveform as a base64 PNG (no data: prefix) for Gemini — the visible
+  // amplitude envelope is exactly what it needs to read the AMP EG correctly.
+  const waveformPng = (): string | undefined => {
+    if (!canvas || !waveformOk) return undefined
+    try {
+      const url = canvas.toDataURL('image/png')
+      return url.slice(url.indexOf(',') + 1) || undefined
+    } catch {
+      return undefined
     }
   }
 
@@ -298,6 +318,8 @@ export function initResynth(): void {
         const program = await analyzeAudio(f, {
           apiKey: getApiKey(),
           model: getModel(),
+          waveformPng: waveformPng(),
+          durationSec: waveformDuration || undefined,
         })
         rawById = program.rawById
         name = program.name

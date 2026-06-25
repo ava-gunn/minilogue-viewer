@@ -56,9 +56,11 @@ parameters consistent with it:
    bass, warm pad, saw lead, FM bell, electric piano, organ, drone, riser/sweep, percussion);
    let this framing guide every choice below.
 2. Pitch — the fundamental, and any glide (→ portamento).
-3. Amplitude envelope — attack, decay, sustain level, release, mapped to the AMP EG (percussive
-   = fast attack + short decay + low sustain; pad = slow attack + high sustain + long release;
-   organ = near-instant on and off).
+3. Amplitude envelope — read attack, decay, sustain level and release from the attached waveform
+   image when present (a sharp left edge = instant attack; a gradual rise = slow attack) and
+   scale the times to the clip's duration; map them to the AMP EG (percussive = fast attack +
+   short decay + low sustain; pad = slow attack + high sustain + long release; organ =
+   near-instant on and off). Never use a slow attack for a sound that is immediately loud.
 4. Spectrum & harmonics → waveform + cutoff — bright/buzzy with all harmonics = SAW; hollow with
    odd harmonics = SQR; soft/rounded with few harmonics = TRI; broadband hiss = MULTI NOISE.
    Overall brightness sets CUTOFF; add RESONANCE only for an audible whistle/emphasis.
@@ -72,7 +74,7 @@ parameters consistent with it:
 
 Be conservative and faithful: only as much resonance, modulation and effect as the recording
 shows; keep VCO pitches centered (0.5) unless you hear detune or an interval; use a single EG
-destination (pick the dominant motion); assume POLY voice mode (one sustained held note). The
+destination (pick the dominant motion); default to UNISON voice mode (a single, thickened note), switching to POLY only when the source is polyphonic — a chord or multiple simultaneous pitches. The
 \`rationale\` should explain your choices in minilogue xd terms. Return ONLY JSON matching the
 schema.`
 
@@ -108,13 +110,23 @@ const glossaryText = (): string =>
 export interface AnalyzeOptions {
   apiKey: string
   model?: string
+  /** Base64 PNG (no data: prefix) of the clip's waveform — sent alongside the audio so the model
+   *  can read the amplitude envelope visually. */
+  waveformPng?: string | undefined
+  /** Clip length in seconds — envelope times must fit within it (a 0.4 s clip can't have a
+   *  multi-second attack/release). */
+  durationSec?: number | undefined
 }
+
+type ContentPart =
+  | { text: string }
+  | { inlineData: { mimeType: string; data: string } }
 
 /** Send the clip to Gemini and return the predicted program. Throws on missing key,
  *  oversized audio, or an unparseable / empty response. */
 export async function analyzeAudio(
   file: File,
-  { apiKey, model = DEFAULT_MODEL }: AnalyzeOptions,
+  { apiKey, model = DEFAULT_MODEL, waveformPng, durationSec }: AnalyzeOptions,
 ): Promise<GeminiProgram> {
   if (!apiKey) throw new Error('Add your Gemini API key in settings first.')
   if (file.size > MAX_BYTES) {
@@ -125,6 +137,33 @@ export async function analyzeAudio(
   const ai = new GoogleGenAI({ apiKey })
   const data = await toBase64(file)
 
+  const duration =
+    durationSec && durationSec > 0
+      ? ` The clip is ${durationSec.toFixed(2)} seconds long — the AMP envelope times must fit within it (a short clip can't have a multi-second attack or release; scale attack/decay/release to the duration).`
+      : ''
+  const parts: ContentPart[] = [
+    {
+      text:
+        'Analyze this recording, then estimate the minilogue xd program that best ' +
+        'reproduces it. Fill the `analysis` from what you actually hear, then set every ' +
+        `program parameter consistent with it.${duration} Parameter reference ` +
+        `(schema ${SCHEMA_VERSION}, prompt ${PROMPT_VERSION}):\n${glossaryText()}`,
+    },
+    { inlineData: { mimeType: audioMime(file), data } },
+  ]
+  if (waveformPng) {
+    parts.push({
+      text:
+        'The PNG below is the amplitude waveform of the SAME clip (x = time, left edge = note ' +
+        'onset, full width = the clip duration; y = amplitude). Read the AMP ENVELOPE from it: ' +
+        'a sharp/vertical left edge = INSTANT attack (amp_attack ≈ 0) — only a visibly gradual ' +
+        'rise means a slow attack; then the decay to a sustained level (a long flat plateau = ' +
+        'high sustain, a fall toward zero = low/no sustain), and the release tail after the ' +
+        'level drops. Set amp_attack / amp_decay / amp_sustain / amp_release to match it.',
+    })
+    parts.push({ inlineData: { mimeType: 'image/png', data: waveformPng } })
+  }
+
   const response = await ai.models.generateContent({
     model,
     config: {
@@ -134,21 +173,7 @@ export async function analyzeAudio(
       // is accepted directly — the field shape matches OpenAPI/JSON-schema.
       responseSchema: buildResponseSchema(),
     },
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          {
-            text:
-              'Analyze this recording, then estimate the minilogue xd program that best ' +
-              'reproduces it. Fill the `analysis` from what you actually hear, then set every ' +
-              'program parameter consistent with it. Parameter reference ' +
-              `(schema ${SCHEMA_VERSION}, prompt ${PROMPT_VERSION}):\n${glossaryText()}`,
-          },
-          { inlineData: { mimeType: audioMime(file), data } },
-        ],
-      },
-    ],
+    contents: [{ role: 'user', parts }],
   })
 
   const text = response.text
