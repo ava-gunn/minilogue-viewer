@@ -58,10 +58,14 @@ async function fakeMidi(page: Page, dump: number[]): Promise<void> {
           'o',
           {
             name: 'minilogue xd SOUND',
-            // A real synth answers a dump request once (on its global channel),
-            // not once per broadcast channel — reply only for channel 0.
+            // A real synth answers once (on its global channel); Web MIDI may
+            // split that long dump across events, so deliver it in fragments to
+            // exercise SysEx reassembly.
             send: (d: number[]) => {
-              if (d[2] === 0x30) listener?.(evt(bytes))
+              if (d[2] !== 0x30) return
+              for (let i = 0; i < bytes.length; i += 256) {
+                listener?.(evt(bytes.slice(i, i + 256)))
+              }
             },
           },
         ],

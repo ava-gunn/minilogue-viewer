@@ -96,25 +96,53 @@ export async function connectMidi(
     refreshTimer = setTimeout(sendRequest, 120)
   }
 
+  // Web MIDI may split a long SysEx dump (≈1179 bytes) across several events, so
+  // reassemble from F0 to F7 before decoding instead of treating each event as a
+  // complete message (which truncated the dump → "decoded dump too short").
+  const MAX_SYSEX = 8192
+  let sysex: number[] = []
+  let inSysex = false
+
+  function handleSysex(msg: Uint8Array): void {
+    if (!isCurrentProgramDump(msg)) return // ignore other SysEx (identity reply…)
+    try {
+      const mode = pendingMode
+      pendingMode = 'full'
+      const prog = decodeCurrentProgramDump(msg)
+      if (mode === 'poll') handlers.onPoll(prog)
+      else handlers.onDump(prog, mode === 'full')
+    } catch (err) {
+      emit('file:error', {
+        message: `Bad program dump: ${err instanceof Error ? err.message : String(err)}`,
+      })
+    }
+  }
+
   function handleMessage(e: MIDIMessageEvent): void {
     const data = e.data
     if (!data || data.length === 0) return
-    if (data[0] === 0xf0) {
-      if (isCurrentProgramDump(data)) {
-        try {
-          const mode = pendingMode
-          pendingMode = 'full'
-          const prog = decodeCurrentProgramDump(data)
-          if (mode === 'poll') handlers.onPoll(prog)
-          else handlers.onDump(prog, mode === 'full')
-        } catch (err) {
-          emit('file:error', {
-            message: `Bad program dump: ${err instanceof Error ? err.message : String(err)}`,
-          })
-        }
+
+    if (data[0] === 0xf0 || inSysex) {
+      // Standalone real-time bytes (clock / active sensing) can interleave a
+      // fragmented SysEx — don't fold them into the buffer.
+      if (inSysex && data[0] >= 0xf8) return
+      if (data[0] === 0xf0) {
+        sysex = []
+        inSysex = true
+      }
+      for (let i = 0; i < data.length; i++) sysex.push(data[i])
+      if (sysex[sysex.length - 1] === 0xf7) {
+        const msg = new Uint8Array(sysex)
+        sysex = []
+        inSysex = false
+        handleSysex(msg)
+      } else if (sysex.length > MAX_SYSEX) {
+        sysex = [] // runaway / lost terminator — drop it
+        inSysex = false
       }
       return
     }
+
     const kind = data[0] & 0xf0
     if (kind === 0xb0 && data.length >= 3) {
       handlers.onControlChange(data[1], data[2])
