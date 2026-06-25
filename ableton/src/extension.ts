@@ -11,15 +11,19 @@ const VIEWER_ID = "minilogue-xd-viewer.open"
 const VIEWER_WIDTH = 1300
 const VIEWER_HEIGHT = 770
 
-// Object scopes the action appears under (mirrors harmony-track). The viewer isn't tied to
-// Live data, so it's offered broadly; right-clicking any of these shows "minilogue xd viewer".
+// Every object scope the SDK exposes, so the action is reachable from a right-click
+// essentially anywhere in Live (a right-click lands on one of these objects). The viewer
+// isn't tied to Live data, so it's offered everywhere.
 const SCOPES = [
-  "AudioTrack",
-  "MidiTrack",
   "AudioClip",
-  "MidiClip",
+  "AudioTrack",
   "ClipSlot",
+  "DrumRack",
+  "MidiClip",
+  "MidiTrack",
+  "Sample",
   "Scene",
+  "Simpler",
 ] as const
 
 export function activate(activation: ActivationContext) {
@@ -46,9 +50,11 @@ export function activate(activation: ActivationContext) {
     }
   })
 
+  // Empty title: Live prepends the manifest name, so the menu entry reads just
+  // "minilogue xd viewer" (a title here would render as "minilogue xd viewer: <title>").
   for (const scope of SCOPES) {
     context.ui
-      .registerContextMenuAction(scope, "Show viewer", VIEWER_ID)
+      .registerContextMenuAction(scope, "", VIEWER_ID)
       .catch((err) =>
         console.error("[minilogue-xd-viewer] failed to register", scope, err),
       )

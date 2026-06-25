@@ -25,6 +25,12 @@ initLoad()
 initLibrary()
 initEmbed()
 
+// Live's WebView can't open an OS file picker from a click, so the OLED hint is drop-only.
+const oledHint = document
+  .getElementById('oled')
+  ?.shadowRoot?.querySelector('.hint')
+if (oledHint) oledHint.textContent = 'drop a patch file here'
+
 // Audio matching / re-synthesis is browser-only; guide the user there if they pick audio.
 on('audio:dropped', () =>
   emit('file:error', {
