@@ -7,7 +7,12 @@
   inline-size: var(--xd-min-w);
   max-inline-size: min(20in, 100%);
   margin-inline: auto;
-  padding: var(--wa-space-s, 0.5rem) var(--wa-space-l, 1.5rem);
+  /* border-box so the inline-size cap includes padding (matches #app / .xd); without it
+     the fixed inline-size + padding overflows #app and the right-aligned refresh juts out. */
+  box-sizing: border-box;
+  /* Inline padding matches the synth chassis's inner padding (.xd uses --wa-space-m),
+     so the right-aligned status + refresh line up with the synth's darker interior. */
+  padding: var(--wa-space-s, 0.5rem) var(--wa-space-m, 1rem);
   font-family: var(--wa-font-family-body, system-ui, sans-serif);
 }
 
@@ -17,6 +22,11 @@
   gap: 0.5em;
   font-size: 0.9rem;
   color: var(--wa-color-text-normal, #e0e0e6);
+}
+
+/* Right-align the connection indicator in the viewer header (matches the resynth bar). */
+.midi-bar #midi-status {
+  margin-inline-start: auto;
 }
 
 .midi-dot {
@@ -53,13 +63,26 @@
   border-color: var(--wa-color-text-quiet, #8a8a93);
 }
 
-/* Legend + colour pickers for the two indicators. Clicking a swatch opens the
+/* Link to the audio -> patch re-synthesis view. */
+.resynth-link {
+  padding: 0.3em 0.95em;
+  font-size: 0.85rem;
+  color: var(--wa-color-text-normal, #e0e0e6);
+  text-decoration: none;
+  border: 1px solid var(--xd-divider, #44444e);
+  border-radius: var(--wa-border-radius-m, 6px);
+}
+.resynth-link:hover {
+  border-color: var(--wa-color-text-quiet, #8a8a93);
+}
+
+/* Legend + colour pickers for the two indicators, in the panel footer (xd-bottom).
+   margin-inline-start: auto pushes it to the right edge. Clicking a swatch opens the
    OS colour picker; the choice updates --xd-knob-teal / --xd-knob-live live. */
 .midi-legend {
   display: inline-flex;
   gap: var(--wa-space-m, 1rem);
   margin-inline-start: auto;
-  padding-inline-end: var(--wa-space-l, 1.5rem);
   font-size: 0.78rem;
   color: var(--wa-color-text-quiet, #8a8a93);
 }

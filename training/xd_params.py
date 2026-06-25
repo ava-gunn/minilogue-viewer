@@ -39,6 +39,19 @@ def _write_raw(buf: bytearray, offset: int, width: int, value: int) -> None:
         buf[offset + 1] = (buf[offset + 1] & 0xFC) | ((value >> 8) & 0x03)
 
 
+def _read_raw(buf: bytes, offset: int, width: int) -> int:
+    if width == 8:
+        return buf[offset]
+    return buf[offset] | ((buf[offset + 1] & 0x03) << 8)  # 10-bit little-endian
+
+
+def read_params(prog_bin: bytes) -> dict[str, int]:
+    """Extract raw param values by id from a prog_bin — the inverse of write_params, and the
+    same raw extraction the TS parser does (8-bit direct; 10-bit little-endian masked to 10
+    bits). Used to label factory presets with their ground-truth params for eval."""
+    return {p["id"]: _read_raw(prog_bin, p["byte_offset"], p["bit_width"]) for p in schema.PARAMS}
+
+
 def _targets(raw_by_id: dict[str, int]) -> dict:
     return {
         "continuous": [raw_by_id[p["id"]] / p["raw_max"] for p in schema.CONTINUOUS],

@@ -55,6 +55,21 @@ export function currentProgramDumpRequest(channel = 0): Uint8Array {
   ])
 }
 
+/** Build a CURRENT PROGRAM DATA DUMP message that loads a 1024-byte prog_bin into the
+    synth's edit buffer: F0 42 3g 00 01 51 40 <7-bit packed prog> F7. Inverse of
+    decodeCurrentProgramDump; matches korg.program_dump in the trainer. */
+export function currentProgramDump(prog: Uint8Array, channel = 0): Uint8Array {
+  return new Uint8Array([
+    SYSEX_START,
+    KORG_ID,
+    FORMAT_HI | (channel & 0x0f),
+    ...MODEL_ID,
+    FUNC_DUMP,
+    ...korgEncode8to7(prog),
+    SYSEX_END,
+  ])
+}
+
 /** True if msg is a minilogue xd CURRENT PROGRAM DATA DUMP (any channel). */
 export function isCurrentProgramDump(msg: Uint8Array): boolean {
   return (

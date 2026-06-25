@@ -1,14 +1,22 @@
 import type { MinilogueXDPatch } from '../types/synth'
 import { decodeToSamples } from './audio'
-import { outputsToPatch } from './decode'
+import { outputsToRawById, rawByIdToPatch } from './decode'
 import { logMel } from './mel'
 import { runModel } from './session'
 
-/** Audio file -> inferred Minilogue XD patch. Uses the Phase 2 dummy model for now;
- *  the pipeline (decode -> mel -> onnx -> RawPatch -> parsePatch) is the real one. */
-export async function matchAudioFile(file: File): Promise<MinilogueXDPatch> {
+/** Audio file -> raw Minilogue XD params by id, via the built-in ONNX model
+ *  (decode -> mel -> onnx -> argmax/denormalize). The id-keyed form is what both the
+ *  panel display (rawByIdToPatch) and the contribution upload consume. */
+export async function matchAudioRawById(
+  file: File,
+): Promise<Record<string, number>> {
   const samples = await decodeToSamples(file)
   const mel = logMel(samples)
   const outputs = await runModel(mel)
-  return outputsToPatch(outputs)
+  return outputsToRawById(outputs)
+}
+
+/** Audio file -> inferred Minilogue XD patch (built-in model). */
+export async function matchAudioFile(file: File): Promise<MinilogueXDPatch> {
+  return rawByIdToPatch(await matchAudioRawById(file))
 }

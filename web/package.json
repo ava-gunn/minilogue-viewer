@@ -20,6 +20,8 @@
   },
   "dependencies": {
     "@awesome.me/webawesome": "^3.9.0",
+    "@google/genai": "^1.0.0",
+    "@vercel/blob": "^0.27.0",
     "fflate": "^0.8.3",
     "onnxruntime-web": "^1.27.0",
     "zod": "^4.4.3"

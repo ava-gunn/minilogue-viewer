@@ -5,6 +5,7 @@
 import { emit } from '../events/bus'
 import type { AppEventMap } from '../events/types'
 import {
+  currentProgramDump,
   currentProgramDumpRequest,
   decodeCurrentProgramDump,
   isCurrentProgramDump,
@@ -24,6 +25,9 @@ export interface MidiHandlers {
 export interface MidiController {
   /** Re-request the current program (debounced). */
   refresh: () => void
+  /** Load a 1024-byte prog_bin into the synth's edit buffer. Returns false if no
+      output port is available. */
+  sendProgram: (prog: Uint8Array) => boolean
 }
 
 const DEVICE_RE = /minilogue\s*xd/i
@@ -76,18 +80,33 @@ export async function connectMidi(
     return ports.find((p) => DEVICE_RE.test(p.name ?? ''))?.name ?? undefined
   }
 
-  function sendRequest(): void {
+  // Prefer the SOUND port (it answers/loads program dumps), else any named minilogue
+  // xd port, else every output. The synth only acts on its global channel, so callers
+  // broadcast all 16.
+  function targetOutputs() {
     const all = [...access.outputs.values()]
     const named = all.filter((p) => DEVICE_RE.test(p.name ?? ''))
     const pool = named.length ? named : all
     const sound = pool.filter((p) => SOUND_RE.test(p.name ?? ''))
-    // Prefer the SOUND port (it answers program dumps); broadcast all 16 channels
-    // since the synth only replies on its global one.
-    for (const out of sound.length ? sound : pool) {
+    return sound.length ? sound : pool
+  }
+
+  function sendRequest(): void {
+    for (const out of targetOutputs()) {
       for (let ch = 0; ch < 16; ch++) {
         out.send(Array.from(currentProgramDumpRequest(ch)))
       }
     }
+  }
+
+  function sendProgram(prog: Uint8Array): boolean {
+    const outs = targetOutputs()
+    for (const out of outs) {
+      for (let ch = 0; ch < 16; ch++) {
+        out.send(Array.from(currentProgramDump(prog, ch)))
+      }
+    }
+    return outs.length > 0
   }
 
   function refresh(seedLive = true): void {
@@ -182,5 +201,5 @@ export async function connectMidi(
     sendRequest()
   }, 1500)
 
-  return { refresh }
+  return { refresh, sendProgram }
 }

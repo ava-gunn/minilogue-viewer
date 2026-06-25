@@ -28,3 +28,7 @@ training/checkpoints/
 training/data/surge/
 training/data/xd/
 training/data/hard_cases/
+training/data/contrib/
+training/eval/set/
+training/.daemon.pid
+training/.daemon.log

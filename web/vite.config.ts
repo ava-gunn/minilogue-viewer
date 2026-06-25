@@ -32,6 +32,16 @@ const serveOrtRuntime = (): Plugin => ({
 
 export default defineConfig({
   server: { port: 5173, strictPort: true },
+  // Two entry points: the file viewer (index.html) and the re-synthesis view
+  // (resynth.html). cleanUrls (vercel.json) serves the latter at /resynth.
+  build: {
+    rollupOptions: {
+      input: {
+        main: resolve(root, 'index.html'),
+        resynth: resolve(root, 'resynth.html'),
+      },
+    },
+  },
   // Keep ort out of dep pre-bundling so esbuild doesn't strip the @vite-ignore on its
   // runtime wasm-glue import.
   optimizeDeps: { exclude: ['onnxruntime-web', 'onnxruntime-web/wasm'] },

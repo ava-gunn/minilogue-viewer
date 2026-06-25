@@ -42,7 +42,10 @@ const styles = `
   }
   .marker.live {
     background: transparent;
-    border: 1.5px solid var(--xd-knob-live, #f6a821);
+    /* Ring sits just outside the program circle — the slight gap matches the
+       effects / LED toggles (outline-offset, not a flush border). */
+    outline: 1.5px solid var(--xd-knob-live, #f6a821);
+    outline-offset: 1px;
     transform: translateX(-50%) translateY(calc(var(--active-live, 0) * var(--slot-h)));
   }
   /* Until the synth reports a value, only the program circle shows. */

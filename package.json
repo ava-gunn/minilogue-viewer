@@ -14,7 +14,10 @@
     "check": "pnpm -C web check",
     "lint": "pnpm -C web lint",
     "format": "pnpm -C web format",
-    "build:schema": "pnpm -C web build:schema"
+    "build:schema": "pnpm -C web build:schema",
+    "daemon:start": "bash scripts/daemon.sh start",
+    "daemon:stop": "bash scripts/daemon.sh stop",
+    "daemon:status": "bash scripts/daemon.sh status"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1"

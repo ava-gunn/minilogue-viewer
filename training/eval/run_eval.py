@@ -30,7 +30,7 @@ from pathlib import Path
 
 import numpy as np
 
-from training import korg, schema
+from training import korg, schema, xd_params
 from training.eval import infer, metrics
 
 SR = schema.AUDIO["sample_rate"]
@@ -60,6 +60,36 @@ def _aggregate(results: list[dict], by: str) -> dict:
         g: {"n": len(rs), **{k: statistics.median(r[k] for r in rs) for k in keys}}
         for g, rs in sorted(groups.items())
     }, keys
+
+
+def _param_metrics(pred: dict[str, int], true: dict) -> dict:
+    """Predicted vs ground-truth raw params (only for cohorts that carry true_raw, i.e.
+    factory presets): mean continuous L1 in [0,1] space, discrete/boolean exact-match rate."""
+    cont = [
+        abs(pred[p["id"]] / p["raw_max"] - int(true[p["id"]]) / p["raw_max"])
+        for p in schema.CONTINUOUS
+        if p["id"] in true and p["id"] in pred
+    ]
+    disc = [pred[p["id"]] == int(true[p["id"]]) for p in schema.DISCRETE if p["id"] in true]
+    boo = [pred[p["id"]] == int(true[p["id"]]) for p in schema.BOOLEAN if p["id"] in true]
+    return {
+        "cont_l1": float(np.mean(cont)) if cont else 0.0,
+        "disc_acc": float(np.mean(disc)) if disc else 0.0,
+        "bool_acc": float(np.mean(boo)) if boo else 0.0,
+    }
+
+
+def _report_params(out: Path, results: list[dict]) -> None:
+    """Param-space accuracy table — only presets have known ground truth, so this is the
+    metric the factory cohort adds over the audio-only resynthesis distance."""
+    agg, keys = _aggregate(results, "cohort")
+    print(f"\n{'param-acc':12} {'n':>4} " + " ".join(f"{k:>9}" for k in keys))
+    for g, row in agg.items():
+        print(f"{str(g):12} {row['n']:>4} " + " ".join(f"{row[k]:>9.3f}" for k in keys))
+    rep = json.loads((out / "report.json").read_text())
+    rep["param_by_cohort"], rep["param_per_clip"] = agg, results
+    (out / "report.json").write_text(json.dumps(rep, indent=2))
+    print("param-acc: cont_l1 lower=better; disc_acc/bool_acc higher=better")
 
 
 def _report(out: Path, results: list[dict]) -> None:
@@ -130,12 +160,15 @@ def main() -> None:
         ctx = keep_awake()
 
     results: list[dict] = []
+    param_results: list[dict] = []
     try:
         with ctx:
             for r in rows:
                 rid, midi = r["id"], int(r.get("pitch_midi", 60))
                 signal = infer.load_audio(Path(r["source_path"]))
-                prog_bin = infer.predict_prog_bin(session, signal, template)
+                cont, disc, boo = infer.run_model(session, signal)
+                raw_pred = infer.decode_raw(cont, disc, boo)
+                prog_bin = xd_params.write_params(template, raw_pred)
                 (args.out / "programs" / f"{rid}.prog_bin").write_bytes(prog_bin)
                 korg.write_mnlgxdprog(
                     args.template, prog_bin, args.out / "programs" / f"{rid}.mnlgxdprog"
@@ -158,6 +191,15 @@ def main() -> None:
 
                 m = metrics.compare(signal, xd_audio, lowpass_hz=args.lowpass)
                 results.append({"id": rid, "cohort": r.get("cohort", "?"), "pitch": midi, **m})
+                if r.get("true_raw"):  # presets carry ground-truth params -> param accuracy
+                    param_results.append(
+                        {
+                            "id": rid,
+                            "cohort": r.get("cohort", "?"),
+                            "pitch": midi,
+                            **_param_metrics(raw_pred, r["true_raw"]),
+                        }
+                    )
                 print(f"{rid} [{r.get('cohort')} m{midi}] mel_l1={m['mel_l1']:.3f}")
     finally:
         if xd is not None:
@@ -171,6 +213,8 @@ def main() -> None:
         )
         return
     _report(args.out, results)
+    if param_results:
+        _report_params(args.out, param_results)
 
 
 if __name__ == "__main__":

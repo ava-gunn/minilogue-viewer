@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en" class="wa-dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Resynthesis · minilogue xd viewer</title>
+
+    <!-- Vercel Web Analytics (script served by Vercel at runtime once enabled). -->
+    <script>
+      window.va =
+        window.va ||
+        ((...args) => {
+          window.vai = window.vai || []
+          window.vai.push(args)
+        })
+    </script>
+    <script defer src="/_vercel/insights/script.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <header class="resynth-bar">
+        <a class="resynth-back" href="/">← Viewer</a>
+        <h1 class="resynth-heading">Audio → patch resynthesis</h1>
+        <span id="midi-status" class="midi-status" data-state="requesting">
+          <span class="midi-dot"></span>
+          <span class="midi-text">Connecting to MIDI…</span>
+        </span>
+        <button id="midi-refresh" class="midi-refresh" type="button" hidden>Refresh</button>
+      </header>
+
+      <!-- The synth shows the proposed patch; the form sits below it. -->
+      <div id="panel-root"></div>
+
+      <!-- upload audio → get a patch → try it → send me feedback -->
+      <ol id="resynth-steps" class="resynth-steps">
+        <li data-step="upload">Upload audio</li>
+        <li data-step="patch">Get a patch</li>
+        <li data-step="try">Try it</li>
+        <li data-step="feedback">Send me feedback</li>
+      </ol>
+
+      <section class="resynth-controls">
+        <!-- engine selector -->
+        <fieldset class="resynth-engine">
+          <legend>Model</legend>
+          <label>
+            <input type="radio" name="resynth-engine" id="engine-builtin" value="builtin" checked />
+            Built-in model
+          </label>
+          <label>
+            <input type="radio" name="resynth-engine" id="engine-gemini" value="gemini" />
+            Gemini
+          </label>
+        </fieldset>
+
+        <!-- gemini credentials (shown only for the Gemini engine) -->
+        <div id="gemini-creds" class="resynth-creds" hidden>
+          <label class="resynth-field">
+            <span>Gemini API token</span>
+            <input id="gemini-key" type="password" autocomplete="off" placeholder="AIza…" />
+          </label>
+          <label class="resynth-field">
+            <span>Model</span>
+            <select id="gemini-model"></select>
+          </label>
+          <p class="resynth-note">
+            Stored only in this browser, sent only to Google. Get a token at
+            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">
+              aistudio.google.com/apikey</a>.
+          </p>
+        </div>
+
+        <!-- upload / drop -->
+        <div id="resynth-drop" class="resynth-drop">
+          <input id="resynth-file" type="file" accept=".wav,.mp3,.flac,.ogg,.m4a,.aac" hidden />
+          <button id="resynth-file-btn" type="button" class="resynth-btn">Choose audio…</button>
+          <span class="resynth-drop-hint">or drop an audio file here</span>
+          <span id="resynth-filename" class="resynth-filename"></span>
+        </div>
+
+        <!-- waveform + audition -->
+        <div id="resynth-preview" class="resynth-preview" hidden>
+          <button id="resynth-play" type="button" class="resynth-play" aria-label="Play">▶</button>
+          <div class="resynth-wave-wrap">
+            <canvas id="resynth-wave" class="resynth-wave" width="900" height="80"></canvas>
+            <div id="resynth-progress" class="resynth-progress"></div>
+          </div>
+          <span id="resynth-time" class="resynth-time">0:00</span>
+          <!-- biome-ignore lint/a11y/useMediaCaption: user-uploaded clip for audition; no captions exist -->
+          <audio id="resynth-audio" preload="metadata"></audio>
+        </div>
+
+        <div class="resynth-actions">
+          <button id="resynth-generate" type="button" class="resynth-btn resynth-btn-primary" disabled>
+            Resynthesize
+          </button>
+          <button id="resynth-load" type="button" class="resynth-btn" hidden disabled>
+            Load patch
+          </button>
+          <span id="resynth-spinner" class="resynth-spinner" hidden aria-hidden="true"></span>
+          <span id="resynth-status" class="resynth-status" aria-live="polite"></span>
+        </div>
+
+        <!-- feedback -->
+        <div id="resynth-feedback" class="resynth-feedback" hidden>
+          <p class="resynth-result" id="resynth-result"></p>
+          <div class="resynth-feedback-row">
+            <label class="resynth-field resynth-field-inline" for="resynth-pitch">
+              <span>Note played</span>
+              <select id="resynth-pitch" class="resynth-select">
+                <option value="36">C2</option>
+                <option value="48">C3</option>
+                <option value="60" selected>C4</option>
+                <option value="72">C5</option>
+                <option value="84">C6</option>
+              </select>
+            </label>
+            <span class="resynth-feedback-q">How's the match?</span>
+            <button id="resynth-up" type="button" class="resynth-thumb" aria-label="Good match">👍</button>
+            <button id="resynth-down" type="button" class="resynth-thumb" aria-label="Poor match">👎</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Transient status (errors) -->
+      <div id="status-bar" aria-live="polite"></div>
+    </div>
+
+    <script type="module" src="/src/resynth.ts"></script>
+  </body>
+</html>

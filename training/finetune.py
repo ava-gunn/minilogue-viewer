@@ -14,7 +14,12 @@ import argparse
 from pathlib import Path
 
 import torch
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import (
+    ConcatDataset,
+    DataLoader,
+    WeightedRandomSampler,
+    random_split,
+)
 
 from training import audibility, schema
 from training.data.xd_dataset import XdDataset
@@ -81,6 +86,13 @@ def evaluate(model, loader, device) -> dict[str, float]:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--data", type=Path, required=True)
+    ap.add_argument(
+        "--contrib",
+        type=Path,
+        help="extra pseudo-labeled split (training/data/pull_contributions.py); "
+        "mixed into training only, down-weighted",
+    )
+    ap.add_argument("--contrib-weight", type=float, default=0.3)
     ap.add_argument("--epochs", type=int, default=60)
     ap.add_argument("--batch-size", type=int, default=64)
     ap.add_argument("--lr", type=float, default=1e-3)
@@ -97,7 +109,20 @@ def main() -> None:
     train_ds, val_ds = random_split(
         dataset, [len(dataset) - n_val, n_val], generator=torch.Generator().manual_seed(0)
     )
-    train_dl = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, drop_last=True)
+
+    # Pseudo-labeled contributions join training only (val stays pure hardware ground truth)
+    # and are down-weighted via a sampler so they nudge rather than dominate.
+    if args.contrib:
+        contrib_ds = XdDataset(args.contrib)
+        weights = [1.0] * len(train_ds) + [args.contrib_weight] * len(contrib_ds)
+        train_ds = ConcatDataset([train_ds, contrib_ds])
+        sampler = WeightedRandomSampler(weights, num_samples=len(train_ds), replacement=True)
+        train_dl = DataLoader(
+            train_ds, batch_size=args.batch_size, sampler=sampler, drop_last=True
+        )
+        print(f"+ {len(contrib_ds)} pseudo-labeled contrib samples (weight {args.contrib_weight})")
+    else:
+        train_dl = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, drop_last=True)
     val_dl = DataLoader(val_ds, batch_size=args.batch_size)
 
     model = SoundMatchEncoder().to(device)

@@ -8,6 +8,23 @@ export function initShared(): void {
   initFanout()
   initStatus()
   initTooltips()
+  initColors()
+}
+
+/** Let the footer legend swatches (Program / Synth) recolour the indicators live. */
+function initColors(): void {
+  const root = document.documentElement
+  const wire = (id: string, prop: string): void => {
+    const input = document.getElementById(id)
+    if (!(input instanceof HTMLInputElement)) return
+    // Sync the rendered colour to the swatch's initial value, then track edits.
+    root.style.setProperty(prop, input.value)
+    input.addEventListener('input', () =>
+      root.style.setProperty(prop, input.value),
+    )
+  }
+  wire('color-prog', '--xd-knob-teal')
+  wire('color-live', '--xd-knob-live')
 }
 
 /** On patch load, push every parameter out to its control. */
