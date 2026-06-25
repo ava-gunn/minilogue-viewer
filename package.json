@@ -15,5 +15,8 @@
     "lint": "pnpm -C web lint",
     "format": "pnpm -C web format",
     "build:schema": "pnpm -C web build:schema"
+  },
+  "dependencies": {
+    "@vercel/analytics": "^2.0.1"
   }
 }
