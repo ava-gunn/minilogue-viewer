@@ -89,6 +89,17 @@ describe('createLivePatch', () => {
     expect(last('multi', 'typeValue')?.display).toBe('CREEP')
   })
 
+  it('mirrors voice mode type via CC#52', () => {
+    const live = createLivePatch()
+    live.loadDump(progBin)
+    live.controlChange(52, 32) // → UNISON
+    expect(last('voice', 'mode')?.value).toBe(1)
+    live.controlChange(52, 64) // → CHORD
+    expect(last('voice', 'mode')?.value).toBe(2)
+    live.controlChange(52, 96) // → ARP
+    expect(last('voice', 'mode')?.value).toBe(3)
+  })
+
   it('reflects effect on/off via CC92/93/94', () => {
     const live = createLivePatch()
     live.loadDump(progBin)

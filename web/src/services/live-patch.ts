@@ -10,7 +10,7 @@
 
 import { emit } from '../events/bus'
 import { type RawPatch, readRawPatch } from '../parser/binary'
-import { MULTI_ENGINE_COUNT, MULTI_TYPE } from '../parser/enums'
+import { MULTI_ENGINE_COUNT, MULTI_TYPE, VOICE_MODE } from '../parser/enums'
 import { parsePatch } from '../parser/patch'
 import { PARAMS, type ParamDescriptor } from '../sections/params'
 import type { MinilogueXDPatch } from '../types/synth'
@@ -54,8 +54,15 @@ function applyMultiSelect(raw: RawPatch, v: number): void {
   else raw.selectNoise = index
 }
 
-// Voice-mode selector and the deep VPM/USER params have no transmittable CC —
-// they refresh from the SysEx snapshot, not live.
+// Voice Mode Type transmits as CC#52 (0/32/64/96/127 → POLY/UNISON/CHORD/ARP/
+// ARP-LATCH). Map to the program enum's raw byte (ARP-LATCH shown as ARP).
+const VOICE_TX = ['POLY', 'UNISON', 'CHORD', 'ARP', 'ARP'] as const
+function applyVoiceMode(raw: RawPatch, v: number): void {
+  const name = VOICE_TX[Math.min(4, Math.floor((v * 5) / 128))] ?? 'POLY'
+  const idx = VOICE_MODE.indexOf(name)
+  raw.voiceModeType = idx < 0 ? 0 : idx
+}
+
 const CC_TABLE: Record<number, CcSpec> = {
   // continuous 10-bit
   16: {
@@ -226,6 +233,15 @@ const CC_TABLE: Record<number, CcSpec> = {
     key: 'portamento',
     apply: (r, m) => {
       r.portamento = m
+    },
+  },
+
+  // voice mode type (POLY/UNISON/CHORD/ARP) — CC#52
+  52: {
+    section: 'voice',
+    key: 'mode',
+    apply: (r, v) => {
+      applyVoiceMode(r, v)
     },
   },
 

@@ -36,29 +36,30 @@ const styles = `
     box-shadow: inset 0 0 0 1px #0009;
   }
 
-  /* Two levers: program (loaded patch) and live (synth's actual position). */
-  .lever {
+  /* Circle (program) + ring (synth) markers that slide to the active slot. */
+  .marker {
     position: absolute;
-    top: 2px;
-    height: calc((100% - 4px) / 3);
-    border-radius: 0.3rem;
-    box-shadow: 0 1px 2px #000c, inset 0 1px 0 #ffffff33;
+    left: 50%;
+    box-sizing: border-box;
+    --slot-h: calc((var(--xd-toggle-h, 2rem) - 4px) / 3);
+    --marker-d: min(var(--slot-h), calc(var(--xd-toggle-w, 0.85rem) - 4px));
+    inline-size: var(--marker-d);
+    block-size: var(--marker-d);
+    top: calc(2px + (var(--slot-h) - var(--marker-d)) / 2);
+    border-radius: 50%;
     transition: transform var(--wa-transition-normal, 0.15s) ease;
   }
-  .lever.program {
-    left: 2px;
-    width: calc((100% - 6px) / 2);
+  .marker.program {
     background: var(--xd-knob-teal, #2dd4bf);
-    transform: translateY(calc(var(--active, 0) * 100%));
+    box-shadow: 0 0 4px var(--xd-knob-teal, #2dd4bf);
+    transform: translateX(-50%) translateY(calc(var(--active, 0) * var(--slot-h)));
   }
-  .lever.live {
-    right: 2px;
-    width: calc((100% - 6px) / 2);
-    background: var(--xd-knob-live, #f6a821);
-    transform: translateY(calc(var(--active-live, 0) * 100%));
+  .marker.live {
+    background: transparent;
+    border: 1.5px solid var(--xd-knob-live, #f6a821);
+    transform: translateX(-50%) translateY(calc(var(--active-live, 0) * var(--slot-h)));
   }
-  :host(:not([live])) .lever.live { display: none; }
-  :host(:not([live])) .lever.program { width: calc(100% - 4px); }
+  :host(:not([live])) .marker.live { display: none; }
 
   .ticks {
     display: flex;
@@ -114,7 +115,7 @@ class XdWaveSelector extends HTMLElement {
       (w) =>
         `<span class="wave" data-value="${w.value}"><svg viewBox="0 0 24 12" aria-hidden="true"><path d="${w.path}"/></svg></span>`,
     ).join('')
-    this.#shadow.innerHTML = `<div class="switch"><div class="track" part="track"><span class="lever program" part="lever"></span><span class="lever live" part="lever-live"></span></div><div class="ticks" part="ticks">${ticks}</div></div><span class="label" part="label">${label}</span>`
+    this.#shadow.innerHTML = `<div class="switch"><div class="track" part="track"><span class="marker program" part="marker"></span><span class="marker live" part="marker-live"></span></div><div class="ticks" part="ticks">${ticks}</div></div><span class="label" part="label">${label}</span>`
     this.setAttribute('role', 'img')
     const initial = this.getAttribute('value')
     this.#applyProgram(initial === null ? 0 : Number(initial))

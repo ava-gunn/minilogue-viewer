@@ -34,10 +34,12 @@ const styles = `
     background: var(--xd-knob-teal, #2dd4bf);
     transform: translateX(-50%) rotate(var(--knob-angle, -135deg));
   }
-  /* Live needle: the connected synth's actual knob position. Shorter so both
-     stay legible when they coincide; hidden until a live value arrives. */
+  /* Live needle: the connected synth's actual knob position. Same length as the
+     program needle so a given value points to the same spot; thinner and drawn
+     on top so both stay legible when they coincide. Hidden until a live value. */
   .indicator.live {
-    height: 30%;
+    height: 44%;
+    width: 1.5px;
     background: var(--xd-knob-live, #f6a821);
     transform: translateX(-50%) rotate(var(--knob-angle-live, -135deg));
   }
