@@ -2,9 +2,6 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { emit, on } from '../events/bus'
 import { initLibrary } from './load'
 
-// The program library is an ARIA listbox; these guard its keyboard operability (the a11y
-// pass replaced a click-only, keyboard-dead list with roving-tabindex + arrow/enter nav).
-
 beforeEach(() => {
   document.body.innerHTML = `
     <div id="library-panel" hidden>
@@ -29,7 +26,7 @@ it('builds keyboard-operable options with a roving tabindex', () => {
   const opts = options()
   expect(opts).toHaveLength(3)
   expect(opts.every((o) => o.getAttribute('role') === 'option')).toBe(true)
-  expect(opts.map((o) => o.tabIndex)).toEqual([0, -1, -1]) // only the selected option is tabbable
+  expect(opts.map((o) => o.tabIndex)).toEqual([0, -1, -1])
   expect(opts[0].getAttribute('aria-selected')).toBe('true')
 })
 
@@ -42,7 +39,7 @@ it('arrow keys move focus across options (wrapping)', () => {
   expect(document.activeElement).toBe(opts[1])
   key(opts[1], 'ArrowUp')
   expect(document.activeElement).toBe(opts[0])
-  key(opts[0], 'ArrowUp') // wraps to the last
+  key(opts[0], 'ArrowUp')
   expect(document.activeElement).toBe(opts[2])
 })
 

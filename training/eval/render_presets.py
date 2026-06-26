@@ -38,7 +38,7 @@ from training.xd_interface import XdInterface
 
 RMS_FLOOR = 1e-3
 _REPO = Path(__file__).resolve().parents[2]
-_POLY = 0
+_POLY = 4  # POLY voice mode (=4 per Korg MIDI Impl; 0 is ARP LATCH)
 
 
 def _write_wav_atomic(path: Path, audio: np.ndarray, sr: int) -> None:
@@ -144,7 +144,11 @@ def main() -> None:
                 targets = xd_params.targets_for(raw)
                 paths = [audio_dir / f"{pi * p + j:06d}.wav" for j in range(p)]
                 if not all(w.exists() for w in paths):  # (re)load patch only when a render is due
-                    xd.send_patch(xd_params.write_params(prog_bin, raw), settle_s=args.settle)
+                    # Write the preset's params onto the CLEAN template (as the sweep does), not
+                    # the preset's own prog_bin: any stored sequencer/arp/latch lives outside our
+                    # 52-param schema, so starting from the preset would keep it and the held note
+                    # would arpeggiate — ruining the single-sustained-note clip.
+                    xd.send_patch(xd_params.write_params(template, raw), settle_s=args.settle)
                 for j, midi in enumerate(pitches):
                     gid, wav = pi * p + j, paths[j]
                     if wav.exists():

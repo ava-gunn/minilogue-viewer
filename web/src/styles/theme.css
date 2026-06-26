@@ -1,39 +1,31 @@
-/* Scope the whole app to dark mode. */
 html {
   color-scheme: dark;
 }
 
-/* Override WA tokens for the matte-black minilogue xd aesthetic.
-   Scoped to .wa-dark per WA's theming convention; :root mirror keeps
-   our --xd-* tokens available even if the dark class is absent. */
+/* :root mirror keeps our --xd-* tokens available even if the .wa-dark class is absent. */
 .wa-dark,
 :where(:root) {
   /* This Web Awesome build ships no `teal` family, so define the xd teal scale these tokens
-     resolve to (≈#2dd4bf). Without it --wa-color-brand / --xd-knob-teal / --xd-led-on resolve
-     unset and only survive via per-component literal fallbacks. */
+     resolve to (≈#2dd4bf); else --wa-color-brand / --xd-knob-teal / --xd-led-on resolve unset. */
   --wa-color-teal: #2dd4bf;
   --wa-color-teal-40: #2dd4bf;
-  /* Remap brand to minilogue xd teal */
   --wa-color-brand: var(--wa-color-teal);
   --wa-color-brand-fill-normal: oklch(from var(--wa-color-teal-40) l c h / 1);
 
-  /* Panel surfaces — deeper than WA defaults */
   --wa-color-surface-default: #16161a;
   --wa-color-surface-raised: #1f1f24;
   --wa-color-surface-overlay: #2a2a31;
 
-  /* Subdued border for section dividers */
   --wa-color-neutral-border-normal: #3a3a42;
 
-  /* OLED / LCD phosphor (the real xd OLED is white-on-black) */
+  /* The real xd OLED is white-on-black. */
   --xd-oled-text: oklch(92% 0.02 230);
   --xd-oled-bg: #050507;
 
-  /* Small alphanumeric LCD (MULTI ENGINE) — amber/white segment look */
+  /* MULTI ENGINE alphanumeric LCD — amber/white segment look. */
   --xd-lcd-text: oklch(90% 0.03 230);
   --xd-lcd-bg: #04060a;
 
-  /* Knob + control accents */
   --xd-knob-teal: var(--wa-color-teal-40);
   /* Second knob needle: the live position from the connected synth's knob. */
   --xd-knob-live: #f6a821;
@@ -42,27 +34,21 @@ html {
   --xd-led-on: var(--wa-color-teal-40);
   --xd-led-off: oklch(28% 0.02 200);
 
-  /* Panel surfaces specific to the hardware */
   --xd-panel-bg: #0d0d10;
   --xd-group-bg: #18181c;
 
-  /* Section divider lines */
   --xd-divider: #44444e;
 
-  /* Design width — sized to hug the control content (≈1131px) plus the
-     chassis/app padding, so the panel isn't padded with dead space. */
+  /* Design width — control content (≈1131px) plus chassis/app padding, no dead space. */
   --xd-min-w: 1250px;
 
-  /* Uniform toggle-switch track size (all toggles share these). */
   --xd-toggle-w: 0.85rem;
   --xd-toggle-h: 2.6rem;
 
-  /* Etched panel labels — neutral-60/80 for AA contrast on the dark group surfaces
-     (neutral-50/30 came out at ~3.9:1 / ~2:1 against the panel). */
+  /* neutral-60/80 for AA contrast on the dark group surfaces (neutral-50/30 came out ~3.9:1 / ~2:1). */
   --xd-label-color: var(--wa-color-neutral-60);
   --xd-label-bright: var(--wa-color-neutral-80);
   --xd-font: var(--wa-font-family-mono);
 
-  /* Dimmed decorative controls (rendered but inactive) */
   --xd-decorative-opacity: 0.45;
 }

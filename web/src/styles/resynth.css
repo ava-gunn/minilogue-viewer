@@ -1,15 +1,9 @@
-/* Re-synthesis form (lazy-loaded with its controller). Native controls themed to match the
-   synth chassis (gray tones, same width); sits in the slot below the Resynthesis button. */
-
-/* The [hidden] attribute must win over the flex display rules below — otherwise the
-   Gemini credentials / preview / feedback blocks stay visible when toggled off. The
-   descendant selector outranks the single-class display rules without !important. */
+/* [hidden] must win over the flex display rules below; the descendant selector outranks
+   the single-class display rules without !important. */
 .resynth-controls [hidden] {
   display: none;
 }
 
-/* breadcrumbs: upload audio -> get a patch -> try it -> send me feedback.
-   First element below the synth — the margin-top is the gap between them. */
 .resynth-steps {
   display: flex;
   flex-wrap: wrap;
@@ -25,8 +19,7 @@
 
 .resynth-steps li {
   position: relative;
-  /* 0.7 (not 0.4) so upcoming steps still clear AA contrast on the dark chassis; the active
-     step stands out via weight, and aria-current marks it programmatically. */
+  /* 0.7 (not 0.4) so upcoming steps still clear AA contrast on the dark chassis. */
   opacity: 0.7;
   padding-right: 1.25rem;
 }
@@ -109,7 +102,6 @@
   cursor: not-allowed;
 }
 
-/* Lives inside the engine fieldset now — a divided section, not a separate box. */
 .resynth-creds {
   display: flex;
   flex-wrap: wrap;
@@ -152,7 +144,7 @@
   flex: 1 1 12rem;
   font-size: 0.72rem;
   line-height: 1.5;
-  /* Dim via a muted colour, not opacity — group opacity dragged the API-key link below AA. */
+  /* Dim via a muted colour, not opacity — opacity dragged the API-key link below AA. */
   color: var(--wa-color-neutral-on-quiet, #b4b4bc);
 }
 
@@ -192,15 +184,13 @@
   margin-left: auto;
 }
 
-/* Audio + text inputs side by side — mutually exclusive (selecting one disables the other). */
 .resynth-input {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 0.75rem 1rem;
 }
-/* Left column: the drop and the waveform swap in-place (same min-height → no layout shift). The
-   1.4rem top margin lines its box up with the textarea box, which sits below its 1.4rem label. */
+/* 1.4rem top margin lines this box up with the textarea box, which sits below its 1.4rem label. */
 .resynth-audio {
   flex: 1 1 18rem;
   margin-top: 1.4rem;
@@ -233,8 +223,7 @@
   font: inherit;
   font-size: 0.82rem;
   resize: vertical;
-  /* Match the audio box height so the two input outlines are equal. border-box so the 5.5rem
-     includes padding + border, exactly like the drop/preview boxes. */
+  /* border-box so the 5.5rem includes padding + border, like the drop/preview boxes. */
   box-sizing: border-box;
   min-height: 5.5rem;
   padding: 0.5rem 0.6rem;
@@ -416,8 +405,7 @@
   margin-left: auto;
 }
 
-/* Reduced motion: stop the spinner + control transitions (light DOM; the panel web
-   components guard their own shadow-DOM animations). WCAG 2.3.3. */
+/* Light DOM only; the panel web components guard their own shadow-DOM animations. WCAG 2.3.3. */
 @media (prefers-reduced-motion: reduce) {
   .resynth-spinner {
     animation: none;

@@ -1,12 +1,9 @@
-// Send an approved (audio + predicted program) pair to /api/contribute, which stores the
-// audio in Vercel Blob and the metadata in KV. The pair is later pulled into the training
-// repo (training/data/pull_contributions.py) to grow the eval set + a pseudo-labeled split.
+// Pairs are later pulled into the training repo by training/data/pull_contributions.py.
 
 import { PROMPT_VERSION, SCHEMA_VERSION } from '../gemini/schema'
 
 export type Engine = 'builtin' | 'gemini'
-/** 'as-is' = the generated patch is a good match; 'adjusted' = the user's hardware-tweaked
- *  version (uploaded as a better label). No downvote. */
+/** 'as-is' = generated patch is a good match; 'adjusted' = user's hardware-tweaked version as a better label. */
 export type Rating = 'as-is' | 'adjusted'
 
 export interface ContributionInput {

@@ -1,5 +1,4 @@
-// Log-mel spectrogram, matching schema/audio.json. Conventions (to be mirrored in
-// training/data/mel.py and pinned by the Phase 4c golden-vector test):
+// Log-mel spectrogram, matching schema/audio.json and training/data/mel.py. Conventions:
 //   - periodic Hann window (fftbins=True)
 //   - center = False (no reflective padding)
 //   - power spectrum (|X|^2)

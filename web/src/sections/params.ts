@@ -1,14 +1,8 @@
 import { clamp01, lfoRateDivision, pitchToCents } from '../parser/transforms'
 import type { MinilogueXDPatch } from '../types/synth'
 
-/**
- * Maps each panel control (by section + key, matching the HTML data-* attrs)
- * to the value it should display and an optional human-readable readout.
- *
- * `value` is what the control consumes: a normalized 0..1 position for knobs,
- * or a discrete index for switches / wave-selectors / LED groups. Discrete
- * index order MUST match the control's `positions`/`labels` order in index.html.
- */
+// `value` is a normalized 0..1 position for knobs, or a discrete index for switches /
+// wave-selectors / LED groups — index order MUST match the control's positions/labels in index.html.
 export interface ParamDescriptor {
   section: string
   key: string
@@ -47,8 +41,7 @@ const knob = (
 
 const cents = (get: (p: MinilogueXDPatch) => number) => (p: MinilogueXDPatch) =>
   signed(pitchToCents(raw10(get(p))), '¢')
-// VCO pitch is bipolar ±1200¢ (0 at noon); position the dial by cents so it
-// tracks the readout — raw is fine near center, which would skew the dial.
+// VCO pitch is bipolar ±1200¢ (0 at noon); position the dial by cents, not raw.
 const pitchPos =
   (get: (p: MinilogueXDPatch) => number) => (p: MinilogueXDPatch) =>
     clamp01((pitchToCents(raw10(get(p))) + 1200) / 2400)
@@ -56,15 +49,12 @@ const pitchPos =
 const bipolar =
   (get: (p: MinilogueXDPatch) => number) => (p: MinilogueXDPatch) =>
     signed(raw10(get(p)) - 512, '')
-// LFO INT is a unipolar knob: its positive range uses raw 512..1023, so the
-// dial sweeps from min (raw 512) to full (raw 1023) — a small value like +9
-// sits near the bottom (~8 o'clock), not at noon.
+// LFO INT is unipolar: raw 512..1023 maps to dial min..full (a small +9 sits near the bottom, not noon).
 const intPos =
   (get: (p: MinilogueXDPatch) => number) => (p: MinilogueXDPatch) =>
     clamp01((raw10(get(p)) - 512) / 511)
 
 export const PARAMS: ParamDescriptor[] = [
-  // VOICE
   knob(
     'voice',
     'portamento',
@@ -79,7 +69,6 @@ export const PARAMS: ParamDescriptor[] = [
     display: (p) => p.voice.mode,
   },
 
-  // VCO1
   {
     section: 'vco1',
     key: 'wave',
@@ -100,7 +89,6 @@ export const PARAMS: ParamDescriptor[] = [
   ),
   knob('vco1', 'shape', (p) => p.vco1.shape),
 
-  // VCO2
   {
     section: 'vco2',
     key: 'wave',
@@ -124,7 +112,6 @@ export const PARAMS: ParamDescriptor[] = [
   { section: 'vco2', key: 'sync', value: (p) => (p.vco2.sync ? 1 : 0) },
   { section: 'vco2', key: 'ring', value: (p) => (p.vco2.ring ? 1 : 0) },
 
-  // MULTI ENGINE
   {
     section: 'multi',
     key: 'type',
@@ -139,12 +126,10 @@ export const PARAMS: ParamDescriptor[] = [
   ),
   knob('multi', 'shape', (p) => p.multi.shape),
 
-  // MIXER
   knob('mixer', 'vco1', (p) => p.mixer.vco1),
   knob('mixer', 'vco2', (p) => p.mixer.vco2),
   knob('mixer', 'multi', (p) => p.mixer.multi),
 
-  // FILTER
   knob('filter', 'cutoff', (p) => p.filter.cutoff),
   knob('filter', 'resonance', (p) => p.filter.resonance),
   {
@@ -160,13 +145,11 @@ export const PARAMS: ParamDescriptor[] = [
     display: (p) => PERCENT3[p.filter.keyTracking] ?? '',
   },
 
-  // AMP EG
   knob('ampEnv', 'attack', (p) => p.ampEnv.attack),
   knob('ampEnv', 'decay', (p) => p.ampEnv.decay),
   knob('ampEnv', 'sustain', (p) => p.ampEnv.sustain),
   knob('ampEnv', 'release', (p) => p.ampEnv.release),
 
-  // FILTER EG
   knob('filterEnv', 'attack', (p) => p.filterEnv.attack),
   knob('filterEnv', 'decay', (p) => p.filterEnv.decay),
   knob(
@@ -182,7 +165,6 @@ export const PARAMS: ParamDescriptor[] = [
     display: (p) => p.filterEnv.target,
   },
 
-  // LFO
   {
     section: 'lfo',
     key: 'wave',
@@ -217,16 +199,15 @@ export const PARAMS: ParamDescriptor[] = [
     display: (p) => p.lfo.target,
   },
 
-  // EFFECTS — per-slot time/depth. Consumed by the effects-focus controller
-  // (sections/effects.ts), which multiplexes the selected slot onto the panel's
-  // TIME/DEPTH knobs (section "fx"). No control binds to these directly.
+  // Per-slot time/depth: no control binds to these directly; sections/effects.ts
+  // multiplexes the selected slot onto the shared TIME/DEPTH knobs (section "fx").
   knob('modFx', 'time', (p) => p.modFx.time),
   knob('modFx', 'depth', (p) => p.modFx.depth),
   knob('delay', 'time', (p) => p.delay.time),
   knob('delay', 'depth', (p) => p.delay.depth),
   knob('reverb', 'time', (p) => p.reverb.time),
   knob('reverb', 'depth', (p) => p.reverb.depth),
-  // Effect on/off (1 = on) — drives the FX status lights + the ON/OFF toggle.
+  // Effect on/off: 1 = on.
   {
     section: 'modFx',
     key: 'on',

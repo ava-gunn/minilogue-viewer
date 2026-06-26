@@ -56,7 +56,6 @@ describe('<xd-wave-selector>', () => {
 
     emit('param:change', { section: 'vco1', key: 'wave', value: 2 })
 
-    // SAW (value 2) is rendered first (top), so only that cell lights.
     const lit = el.shadowRoot?.querySelectorAll('.wave.on')
     expect(lit?.length).toBe(1)
     expect(lit?.[0]?.getAttribute('data-value')).toBe('2')
@@ -93,7 +92,6 @@ describe('<xd-led-group>', () => {
     expect(rows?.[0]?.classList.contains('prog')).toBe(false)
     expect(el.getAttribute('aria-label')).toBe('VOICE: CHORD')
 
-    // A diverging live value lights a second (amber) row.
     emit('param:live', { section: 'voice', key: 'mode', value: 0 })
     expect(rows?.[0]?.classList.contains('live')).toBe(true)
     expect(el.getAttribute('aria-label')).toBe('VOICE: CHORD (hardware POLY)')

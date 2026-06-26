@@ -79,7 +79,6 @@ describe('<xd-knob>', () => {
 
     emit('param:change', { section: 'filter', key: 'cutoff', value: 1 })
 
-    // Still at its initial (value 0) position.
     expect(el.style.getPropertyValue('--knob-angle')).toBe('-135deg')
   })
 })

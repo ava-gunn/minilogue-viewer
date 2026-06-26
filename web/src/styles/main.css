@@ -1,19 +1,12 @@
-/* Web Awesome theme layer — provides all --wa-* custom properties.
-   Skip native.css: its resets on <button>/<input> would fight our controls. */
+/* Skip native.css: its resets on <button>/<input> would fight our controls. */
 @import "@awesome.me/webawesome/dist/styles/themes/default.css";
 
-/* Our token overrides + --xd-* tokens, layered on top of WA. */
 @import "./theme.css";
 
-/* Panel layout. */
 @import "./panel.css";
 
-/* Live-MIDI status bar. */
 @import "./midi.css";
 
-/* ── Accessibility: utilities + global behaviors (all three views import this) ── */
-
-/* Screen-reader-only content (skip-link target text, the viewer/embed h1). */
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -27,7 +20,6 @@
   white-space: nowrap;
 }
 
-/* Skip link: off-screen until focused, then visible top-left. */
 .skip-link {
   position: absolute;
   inset-block-start: -3rem;
@@ -44,14 +36,12 @@
   inset-block-start: 0.5rem;
 }
 
-/* Visible keyboard focus for native + custom controls — the dark theme's default ring is
-   low-contrast and several bespoke controls lacked one (WCAG 2.4.7). */
+/* Focus ring: dark theme's default is low-contrast and some bespoke controls lacked one (WCAG 2.4.7). */
 :where(button, a, input, select, summary, [tabindex]):focus-visible {
   outline: 2px solid var(--wa-color-teal-40, #2dd4bf);
   outline-offset: 2px;
 }
 
-/* ---- Toast notifications (services/toast.ts) ----------------------------- */
 .toast-stack {
   position: fixed;
   inset-block-start: 1rem;
@@ -114,10 +104,7 @@
   opacity: 1;
 }
 
-/* ---- Resynthesis button (top-left in the MIDI bar) ------------------------ */
-/* Lives in the existing header bar (matches .midi-refresh's size so the bar doesn't grow / push
-   the synth down). Clicking it shows the form below; the form's JS/CSS is lazy-loaded on first
-   click. Left in the bar; #midi-status keeps its margin-inline-start:auto and stays right. */
+/* Matches .midi-refresh's size so the header bar doesn't grow / push the synth down. */
 .resynth-open {
   padding: 0.3em 0.95em;
   font: inherit;
@@ -137,7 +124,6 @@
   cursor: not-allowed;
 }
 
-/* The lazy resynth form sits in the slot below (synth width, centered like the panel). */
 #resynth-form {
   inline-size: var(--xd-min-w, 1250px);
   max-inline-size: min(20in, 100%);

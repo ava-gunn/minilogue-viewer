@@ -20,7 +20,6 @@ describe('<xd-display>', () => {
     expect(el.shadowRoot?.querySelector('.name')?.textContent).toBe(
       'BRASS STAB',
     )
-    // Single program → no index readout.
     expect(el.shadowRoot?.querySelector('.index')?.textContent).toBe('')
   })
 

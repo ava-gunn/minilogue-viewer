@@ -1,6 +1,4 @@
-// The model I/O contract, derived from the shared param spec so it can't drift from
-// the Python trainer (training/schema.py derives the identical layout from the JSON).
-//
+// Model I/O contract; layout must match training/schema.py (derived from the same JSON).
 //   input  `mel`        float32 [1, 1, N_MELS, N_FRAMES]   (log-mel spectrogram)
 //   output `continuous` float32 [1, n_continuous]          sigmoid, raw value / rawMax
 //   output `discrete`   float32 [1, total_discrete]         per-param logit groups

@@ -4,9 +4,7 @@ import { outputsToRawById, rawByIdToPatch } from './decode'
 import { logMel } from './mel'
 import { runModel } from './session'
 
-/** Audio file -> raw Minilogue XD params by id, via the built-in ONNX model
- *  (decode -> mel -> onnx -> argmax/denormalize). The id-keyed form is what both the
- *  panel display (rawByIdToPatch) and the contribution upload consume. */
+/** Audio file -> raw Minilogue XD params by id, via the built-in ONNX model. */
 export async function matchAudioRawById(
   file: File,
 ): Promise<Record<string, number>> {

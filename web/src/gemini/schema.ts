@@ -1,13 +1,10 @@
-// Gemini structured-output schema + prompt context for audio -> Korg program, derived
-// from the shared PARAM_SPEC so it can't drift from the model/byte layout. Gemini emits
-// one value per param id (continuous 0..1, discrete as a label/index, boolean); we map
-// that to raw param space exactly as training/eval/infer.py's decode_raw does, then reuse
-// rawByIdToPatch() for display. Kept free of the @google/genai import so it's unit-testable.
+// Derived from PARAM_SPEC so it can't drift from the model/byte layout. Maps Gemini output to
+// raw param space exactly as training/eval/infer.py's decode_raw does. Kept free of the
+// @google/genai import so it's unit-testable.
 
 import { PARAM_SPEC } from '../parser/param-spec'
 
-// Bump when the prompt or the schema mapping changes, so submissions carry provenance and
-// stale-prompt data is filterable downstream.
+// Bump when the prompt or schema mapping changes, so submissions carry provenance.
 export const PROMPT_VERSION = 'gemini-resynth-v3'
 export const SCHEMA_VERSION = 'xd-params-52-v1'
 
@@ -21,8 +18,8 @@ export interface GeminiSchema {
   propertyOrdering?: string[]
 }
 
-// Musical meaning of each param — the raw byte schema alone isn't enough for Gemini to
-// produce a sensible patch. Bipolar continuous params note that 0.5 is centered.
+// Musical meaning of each param; the raw byte schema alone isn't enough for Gemini.
+// Bipolar continuous params note that 0.5 is centered.
 export const PARAM_GLOSSARY: Record<string, string> = {
   octave: 'master octave; 0..4 maps to -2..+2 octaves (2 = center)',
   portamento: 'glide time between notes; 0 = off',
@@ -89,9 +86,8 @@ export const PARAM_GLOSSARY: Record<string, string> = {
   reverb_depth: 'reverb wet depth',
 }
 
-// What Gemini must determine from the source audio before choosing parameters. Each field maps
-// onto a section of the minilogue xd, so the analysis and the resulting program stay consistent
-// (and we get the rigorous, Korg-relevant breakdown back for training/eval).
+// What Gemini must determine from the source audio before choosing parameters; each field
+// maps onto a section of the minilogue xd.
 export const ANALYSIS_FIELDS: Record<string, string> = {
   sound_type:
     'what kind of sound this is — name the instrument/category, e.g. "synthetic brass/horn (braaam)", "plucked bass", "warm pad", "saw lead", "FM bell", "electric piano", "organ", "noise sweep/riser", "percussion"',
@@ -109,11 +105,11 @@ export const ANALYSIS_FIELDS: Record<string, string> = {
     'audible effects only: chorus/ensemble (MOD), echo (DELAY), room/space tail (REVERB); "dry" if none',
 }
 
-// Numeric AMP envelope (each 0..1), estimated during the LISTEN pass where the waveform is
-// visible and applied directly to the amp EG. The prose `dynamics` alone wasn't reliably
-// translated into params — patches sustained when the description didn't — so we quantify it.
+// Numeric AMP envelope (each 0..1), applied directly to the amp EG. The prose `dynamics`
+// alone wasn't reliably translated into params, so we quantify it.
 export const ENVELOPE_FIELDS: Record<string, string> = {
-  attack: 'attack time 0..1 (0 = instant/immediate onset, 1 = very slow fade-in)',
+  attack:
+    'attack time 0..1 (0 = instant/immediate onset, 1 = very slow fade-in)',
   decay: 'decay time 0..1 — time to fall from the peak to the sustain level',
   sustain:
     'sustain LEVEL 0..1 — the level held WHILE the note continues. 0 if the sound decays to silence on its own (plucked, percussive, one-shot hit); high ONLY if it holds at a steady level',
@@ -140,10 +136,8 @@ function paramSchema(id: string): GeminiSchema {
   }
 }
 
-/** Pass-1 responseSchema: the structured audio analysis ONLY. Kept free of the 52-param program
- *  and the param glossary so the model's whole job in that call is to LISTEN and describe the
- *  source — sharing the call with patch generation pulled it into "design a patch" mode and the
- *  analysis suffered. */
+/** Pass-1 responseSchema: the audio analysis ONLY. Kept free of the program/glossary because
+ *  sharing the call with patch generation pulled it into "design a patch" mode and analysis suffered. */
 export function buildAnalysisSchema(): GeminiSchema {
   const properties: Record<string, GeminiSchema> = {}
   const ordering: string[] = []

@@ -1,0 +1,27 @@
+/* main-viewer only (imported by main.ts), so it never ships in the Ableton embed. */
+.random-patch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.3em 0.95em;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--wa-color-neutral-on-normal, #e6e6ea);
+  background: var(--xd-group-bg, #18181c);
+  border: 1px solid var(--xd-divider, #44444e);
+  border-radius: var(--wa-border-radius-m, 6px);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.random-patch:hover {
+  border-color: var(--wa-color-neutral-50, #8a8a93);
+}
+/* inline-flex above beats the UA [hidden] rule (equal specificity), so re-hide explicitly. */
+.random-patch[hidden] {
+  display: none;
+}
+.random-patch svg {
+  display: block;
+  width: 1.1em;
+  height: 1.1em;
+}

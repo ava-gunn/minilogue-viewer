@@ -1,11 +1,4 @@
-// Domain model for a parsed Minilogue XD program.
-//
-// Every continuous knob field is a normalized 0..1 control position (the linear
-// pot position), so a knob's rotation maps directly from the value. Human
-// display strings (cents, %, note divisions) are derived from these positions
-// in the section modules (M6) via the parser transforms. Discrete controls use
-// string enums (wave/mode/target/type) or small integer indices (octave foot,
-// drive/key-track), and physical toggles are booleans.
+// Continuous knob fields are normalized 0..1 control positions; display strings are derived from them.
 
 export type Wave = 'SQR' | 'TRI' | 'SAW'
 

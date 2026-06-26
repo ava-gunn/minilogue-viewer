@@ -1,9 +1,4 @@
-// Audio -> Korg program via Google Gemini, running browser-direct with the user's own AI Studio
-// key (no backend). Two passes (see analyzeAudio): pass 1 LISTENS — audio + waveform → a
-// structured description of the source, with no synth params in scope so the model isn't pulled
-// into "design a patch" mode; pass 2 DESIGNS — that description + the param glossary → a program
-// we map to raw values (gemini/schema.ts). The @google/genai SDK is dynamically imported so it
-// stays out of the initial bundle.
+// Runs browser-direct with the user's own AI Studio key (no backend).
 
 import {
   buildAnalysisSchema,
@@ -36,11 +31,10 @@ export const MODELS = [
   'gemini-2.5-flash',
 ] as const
 
-// Inline base64 keeps it simple; larger clips would need the Files API (follow-up).
+// Inline base64 limit; larger clips would need the Files API.
 const MAX_BYTES = 18 * 1024 * 1024
 
-// Pass 1 — LISTEN. The model's only job is to characterise the SOURCE audio; deliberately no
-// synth vocabulary so it describes what it hears instead of designing a patch.
+// Pass 1 — LISTEN: characterise the source audio, no synth vocabulary.
 const ANALYST_INSTRUCTION = `You are an expert audio analyst. You are given a short recording of a single instrument or synth sound (and usually an image of its amplitude waveform). LISTEN to it and describe ONLY what you actually hear in the SOURCE — do not design or mention any synthesizer settings; just characterise the sound faithfully and specifically.
 
 Fill every analysis field:
@@ -55,7 +49,7 @@ Fill every analysis field:
 
 Be specific and honest: if something is steady or absent, say so. Return ONLY JSON matching the schema.`
 
-// Pass 2 — DESIGN. Given the pass-1 description (no audio here), build the minilogue xd program.
+// Pass 2 — DESIGN: build the program from the pass-1 description (no audio here).
 const SYNTH_INSTRUCTION = `You are an expert sound designer for the Korg minilogue xd. Given an analysis of a source sound, design the minilogue xd program that best reproduces it. The synth is subtractive, so approximate the sound within its exact signal path:
 - VCO1 + VCO2 (each SQR/TRI/SAW, with a SHAPE/PWM control and an octave foot 16'/8'/4'/2') + one MULTI ENGINE (NOISE, VPM = 2-op FM-style digital, USER), blended in the MIXER (set unused sources to 0).
 - ONE 2-pole low-pass filter: CUTOFF, RESONANCE (self-oscillates when high), DRIVE, KEY TRACK.
@@ -112,12 +106,10 @@ export interface AnalyzeOptions {
   /** Clip length in seconds — envelope times must fit within it (a 0.4 s clip can't have a
    *  multi-second attack/release). */
   durationSec?: number | undefined
-  /** Optional progress callback (the two passes take a moment each). */
   onProgress?: ((message: string) => void) | undefined
 }
 
-// Minimal genai client surface we use, so we can type the helpers without importing the SDK
-// statically (it's dynamically imported to keep it out of the initial bundle).
+// The SDK is dynamically imported (kept out of the initial bundle), so type its surface here.
 type GenAI = {
   models: {
     generateContent: (req: {
@@ -131,7 +123,10 @@ type ContentPart =
   | { text: string }
   | { inlineData: { mimeType: string; data: string } }
 
-function parseJson(text: string | undefined, what: string): Record<string, unknown> {
+function parseJson(
+  text: string | undefined,
+  what: string,
+): Record<string, unknown> {
   if (!text) throw new Error(`Gemini returned no ${what}.`)
   try {
     return JSON.parse(text) as Record<string, unknown>
@@ -145,8 +140,7 @@ const durationNote = (durationSec?: number): string =>
     ? ` The clip is ${durationSec.toFixed(2)} seconds long; describe and scale envelope times relative to that.`
     : ''
 
-/** Pass 1 — listen to the clip and return a structured description of the SOURCE sound, plus a
- *  numeric AMP envelope measured from the waveform. */
+/** Pass 1 — listen: structured description of the source sound + a numeric AMP envelope. */
 async function describeAudio(
   ai: GenAI,
   model: string,
@@ -162,7 +156,8 @@ async function describeAudio(
   const parts: ContentPart[] = [
     { inlineData: { mimeType: audioMime(file), data } },
   ]
-  if (waveformPng) parts.push({ inlineData: { mimeType: 'image/png', data: waveformPng } })
+  if (waveformPng)
+    parts.push({ inlineData: { mimeType: 'image/png', data: waveformPng } })
   parts.push({
     text:
       'Listen to this recording' +
@@ -277,9 +272,7 @@ export async function analyzeAudio(
   )
 
   const rawById = programToRawById(program)
-  // The AMP envelope is measured in the listen pass (where the waveform is visible) and written
-  // straight onto the amp EG — pass 2's prose interpretation tended to over-sustain, producing
-  // patches that droned on when the description said otherwise.
+  // AMP envelope comes from the listen pass (waveform visible), not pass 2 — pass 2 over-sustained.
   const AMP_EG: Record<string, string> = {
     attack: 'amp_attack',
     decay: 'amp_decay',
@@ -288,13 +281,14 @@ export async function analyzeAudio(
   }
   if (envelope) {
     for (const [k, id] of Object.entries(AMP_EG)) {
-      if (typeof envelope[k] === 'number') rawById[id] = continuousToRaw(id, envelope[k])
+      if (typeof envelope[k] === 'number')
+        rawById[id] = continuousToRaw(id, envelope[k])
     }
-    const n = (v: number): string => (typeof v === 'number' ? v.toFixed(2) : '?')
+    const n = (v: number): string =>
+      typeof v === 'number' ? v.toFixed(2) : '?'
     analysis.envelope = `attack ${n(envelope.attack)}, decay ${n(envelope.decay)}, sustain ${n(envelope.sustain)}, release ${n(envelope.release)}`
   }
-  // Voice mode follows the source — the model's own voice_mode was unreliable. Indices per
-  // parser/enums VOICE_MODE: 0 = POLY, 3 = UNISON. Mono → UNISON (thickened), poly → POLY.
+  // voice_mode indices per parser/enums VOICE_MODE: 0 = POLY, 3 = UNISON.
   if (typeof polyphonic === 'boolean') {
     rawById.voice_mode = polyphonic ? 0 : 3
     analysis.voice = polyphonic ? 'polyphonic → POLY' : 'monophonic → UNISON'

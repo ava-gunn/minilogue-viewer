@@ -2,11 +2,6 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-// Structural accessibility guards for all three views (viewer, re-synth, Ableton embed).
-// Parses the shipped HTML and asserts the landmarks/roles/labels the a11y pass added, so a
-// regression (a dropped <main>, h1, skip link, listbox role, status role, or control label)
-// fails the suite. Contrast/keyboard live behaviors are covered by the axe e2e + load tests.
-
 const view = (name: string): Document => {
   // vitest runs with cwd = web/, where the view HTML files live.
   const html = readFileSync(resolve(process.cwd(), name), 'utf8')

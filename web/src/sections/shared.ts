@@ -1,9 +1,7 @@
 import { emit, on } from '../events/bus'
 import { PARAMS } from './params'
 
-/** Panel-generic wiring reused by both pages (file viewer + live MIDI): patch
-    fanout, knob tooltips, and the transient error badge. Kept out of app.ts so
-    the live page doesn't pull in the file-loading / audio-inference bundle. */
+// Kept out of app.ts so the live page doesn't pull in the file-loading / audio-inference bundle.
 export function initShared(): void {
   initFanout()
   initStatus()
@@ -11,13 +9,11 @@ export function initShared(): void {
   initColors()
 }
 
-/** Let the footer legend swatches (Program / Synth) recolour the indicators live. */
 function initColors(): void {
   const root = document.documentElement
   const wire = (id: string, prop: string): void => {
     const input = document.getElementById(id)
     if (!(input instanceof HTMLInputElement)) return
-    // Sync the rendered colour to the swatch's initial value, then track edits.
     root.style.setProperty(prop, input.value)
     input.addEventListener('input', () =>
       root.style.setProperty(prop, input.value),
@@ -26,15 +22,13 @@ function initColors(): void {
   wire('color-prog', '--xd-knob-teal')
   wire('color-live', '--xd-knob-live')
 
-  // The Program/Synth legend only makes sense with a synth connected (two needle colours);
-  // reveal it only while Web MIDI reports a connection.
+  // The Program/Synth legend (two needle colours) only applies while a synth is connected.
   const legend = document.querySelector('.midi-legend')
   on('midi:status', ({ state }) => {
     legend?.toggleAttribute('hidden', state !== 'connected')
   })
 }
 
-/** On patch load, push every parameter out to its control. */
 function initFanout(): void {
   on('patch:load', ({ patch }) => {
     for (const { section, key, value, display } of PARAMS) {
@@ -50,7 +44,6 @@ function initFanout(): void {
   })
 }
 
-/** Transient error badge in the status bar. */
 function initStatus(): void {
   on('file:error', ({ message }) => {
     const bar = document.getElementById('status-bar')
@@ -65,8 +58,7 @@ function initStatus(): void {
   })
 }
 
-/** Hover/focus value readout on each knob via WA tooltips (for=-anchored, so
-    they stay out of the panel's flow and don't affect layout). */
+// WA tooltips are for=-anchored so they stay out of the panel's flow and don't affect layout.
 function initTooltips(): void {
   const container = document.createElement('div')
   container.id = 'tooltips'
@@ -101,7 +93,6 @@ function initTooltips(): void {
       t.live !== undefined && t.live !== t.prog ? `${prog} → ${t.live}` : prog
   }
 
-  // Program value (loaded patch) and the live synth value share each tooltip.
   on('param:change', ({ section, key, display }) => {
     if (display === undefined) return
     const t = tips.get(`${section}:${key}`)

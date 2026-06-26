@@ -2,10 +2,8 @@ import { emit, on } from '../events/bus'
 import { parseArchive } from '../parser'
 import type { MinilogueXDPatch } from '../types/synth'
 
-// Patch-file loading + library drawer, with no audio/inference dependency — shared by the
-// full viewer (app.ts) and the Ableton embed (embed.ts), which must stay ONNX-free.
+// No audio/inference dependency: shared with the Ableton embed (embed.ts), which must stay ONNX-free.
 
-/** A dropped/browsed file → parsed patches → events. */
 export function initLoad(): void {
   on('file:dropped', async ({ file }) => {
     try {
@@ -26,7 +24,6 @@ export function initLoad(): void {
   })
 }
 
-/** Program library drawer for .mnlgxdlib files. */
 export function initLibrary(): void {
   on('file:parsed-lib', ({ patches }) => {
     const panel = document.getElementById('library-panel')

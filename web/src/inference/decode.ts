@@ -1,7 +1,3 @@
-// Model outputs -> RawPatch -> MinilogueXDPatch. The model predicts in raw parameter
-// space, so we assemble a RawPatch and hand it to the existing parsePatch(), reusing
-// every transform curve (pitch->cents, egInt->bipolar, etc.) instead of duplicating them.
-
 import type { RawPatch } from '../parser/binary'
 import { parsePatch } from '../parser/patch'
 import type { MinilogueXDPatch } from '../types/synth'
@@ -12,8 +8,6 @@ const clampRound = (v: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, Math.round(v)))
 
 export function outputsToRawPatch(out: RawOutputs): RawPatch {
-  // Every numeric field is populated from the spec below; name + modFxType (excluded
-  // from the spec) are set explicitly, so no RawPatch field is left undefined.
   const raw = { name: 'AI MATCH', modFxType: 0 } as unknown as RawPatch
   const fields = raw as unknown as Record<string, number | string>
 
@@ -51,9 +45,6 @@ export function outputsToPatch(out: RawOutputs): MinilogueXDPatch {
   return parsePatch(outputsToRawPatch(out))
 }
 
-// Model outputs -> raw param values keyed by spec id (continuous denormalized, discrete
-// argmaxed, boolean thresholded). The id-keyed form the Gemini path also uses, so the
-// built-in model can feed the same rawByIdToPatch() display and contribution-upload path.
 export function outputsToRawById(out: RawOutputs): Record<string, number> {
   const raw: Record<string, number> = {}
 
@@ -83,10 +74,6 @@ export function outputsToRawById(out: RawOutputs): Record<string, number> {
   return raw
 }
 
-// Same target as outputsToRawPatch, but fed raw param values keyed by spec id (what the
-// Gemini path produces) instead of model head tensors: continuous already in raw space,
-// discrete as a class index, boolean as 0/1. Mirrors outputsToRawPatch field-for-field so
-// both inference paths reconstruct patches identically (modFxType excluded, as in the spec).
 export function rawByIdToPatch(
   rawById: Record<string, number>,
   name = 'AI MATCH',

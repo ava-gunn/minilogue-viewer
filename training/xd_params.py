@@ -6,8 +6,8 @@ are emitted in the model's head layout (schema.CONTINUOUS / DISCRETE / BOOLEAN o
 continuous normalized to [0,1] by raw_max, discrete as class indices, boolean as 0/1 —
 the label format stored alongside each recorded clip in the (params, audio) sweep dataset.
 
-voice_mode is held at POLY (index 0): ARP/CHORD/UNISON turn one held note into a sequence
-or chord, which would break the single-sustained-note timbre assumption.
+voice_mode is held at POLY (raw 4): ARP (raw 0/1)/CHORD/UNISON turn one held note into a
+sequence or chord, which would break the single-sustained-note timbre assumption.
 """
 
 from __future__ import annotations
@@ -19,7 +19,9 @@ from scipy.stats.qmc import Sobol
 
 from training import schema
 
-_VOICE_MODE_POLY = 0
+# Korg MIDI Impl: VOICE MODE TYPE @21 is 0=ARP LATCH, 1=ARP, 2=CHORD, 3=UNISON, 4=POLY.
+# POLY is 4, NOT 0 — forcing 0 latches the arpeggiator and re-triggers every note.
+_VOICE_MODE_POLY = 4
 
 # Audible sub-ranges: confine these continuous params to a fraction of raw_max so sampled
 # patches reliably make sound and their oscillators are on — which makes their params

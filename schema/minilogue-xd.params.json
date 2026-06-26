@@ -44,7 +44,7 @@
       "category": "voice",
       "cardinality": 5,
       "values": [
-        "POLY",
+        "ARP",
         "ARP",
         "CHORD",
         "UNISON",
@@ -227,8 +227,8 @@
         "FAT2",
         "AIR1",
         "AIR2",
-        "DCY1",
-        "DCY2",
+        "DECAY1",
+        "DECAY2",
         "CREEP",
         "THROAT"
       ]

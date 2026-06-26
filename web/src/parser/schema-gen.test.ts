@@ -27,9 +27,6 @@ describe('committed schema matches the generator (drift guard)', () => {
   })
 })
 
-// Prove every spec entry's offset + bit width agree with the binary reader: write a
-// sentinel at the declared offset and confirm readRawPatch surfaces it on the field.
-// A fresh zeroed buffer per entry means a mis-wired offset reads 0 and fails.
 const progBuffer = (): Uint8Array => {
   const b = new Uint8Array(1024)
   b.set([0x50, 0x52, 0x4f, 0x47], 0) // 'PROG'

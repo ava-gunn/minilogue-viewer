@@ -1,5 +1,3 @@
-/* Ableton embed header — loaded only by embed.ts, so these rules never affect the viewer
-   or resynth pages. Reuses .midi-bar for layout; pushes the Resynthesis link to the right. */
 .embed-title {
   font-size: 0.9rem;
   letter-spacing: 0.06em;
@@ -7,7 +5,6 @@
   color: var(--wa-color-text-normal, #e0e0e6);
 }
 
-/* Link to the full web app (opened in the system browser); pushed to the right. */
 .embed-web-link {
   margin-inline-start: auto;
   font-size: 0.85rem;
@@ -41,8 +38,7 @@
   border-color: var(--wa-color-text-quiet, #8a8a93);
 }
 
-/* In the fixed-size modal, cap the library list so it scrolls internally instead of pushing
-   the synth out of view; the window is sized to show this open (see VIEWER_HEIGHT). */
+/* Cap height so the list scrolls internally; window sized to fit this open (see VIEWER_HEIGHT). */
 #program-list {
   max-height: 12rem;
   overflow-y: auto;

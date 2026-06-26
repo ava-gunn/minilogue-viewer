@@ -42,8 +42,6 @@ const styles = `
   }
   .marker.live {
     background: transparent;
-    /* Ring sits just outside the program circle — the slight gap matches the
-       effects / LED toggles (outline-offset, not a flush border). */
     outline: 1.5px solid var(--xd-knob-live, #f6a821);
     outline-offset: 1px;
     transform: translateX(-50%) translateY(calc(var(--active-live, 0) * var(--slot-h)));
@@ -54,8 +52,7 @@ const styles = `
   .ticks {
     display: flex;
     flex-direction: column;
-    /* space-around centers each tick in its slot so it lines up with the marker (the
-       toggle setting), and tightens the inner gaps vs space-between. */
+    /* space-around centers each tick in its slot to line up with the marker. */
     justify-content: space-around;
     font-size: 0.45rem;
     letter-spacing: 0.04em;

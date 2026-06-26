@@ -56,8 +56,6 @@ const styles = `
   }
   .marker.live {
     background: transparent;
-    /* Ring sits just outside the program circle — the slight gap matches the
-       effects / LED toggles (outline-offset, not a flush border). */
     outline: 1.5px solid var(--xd-knob-live, #f6a821);
     outline-offset: 1px;
     transform: translateX(-50%) translateY(calc(var(--active-live, 0) * var(--slot-h)));

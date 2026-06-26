@@ -1,7 +1,6 @@
-// Write raw param values (by spec id) into a template prog_bin — the inverse of
-// readRawPatch / binary.ts, mirroring training/xd_params.py write_params. Used to load a
-// generated patch onto the hardware: overwrite only the param-region bytes of a valid
-// 1024-byte program, leaving header / name / sequence intact.
+// Inverse of readRawPatch / binary.ts, mirroring training/xd_params.py write_params.
+// Overwrites only the param-region bytes of a valid 1024-byte program, leaving
+// header / name / sequence intact.
 
 import { readRawPatch } from './binary'
 import { PARAM_SPEC } from './param-spec'

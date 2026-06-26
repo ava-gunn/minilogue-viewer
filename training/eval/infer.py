@@ -96,7 +96,7 @@ def decode_raw(
     for p, v in zip(schema.BOOLEAN, boo):
         raw[p["id"]] = 1 if float(v) >= 0.5 else 0
     if force_poly:
-        raw["voice_mode"] = 0  # POLY: a single sustained note, never ARP/CHORD/UNISON
+        raw["voice_mode"] = 4  # POLY (=4 per Korg MIDI Impl; 0 is ARP LATCH). Single sustained note.
     return raw
 
 

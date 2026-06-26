@@ -33,6 +33,17 @@
         <button id="resynth-open" class="resynth-open" type="button" aria-controls="resynth-form">
           Resynthesis
         </button>
+        <button id="random-patch" class="random-patch" type="button" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2" />
+            <circle cx="8" cy="8" r="1.6" fill="currentColor" />
+            <circle cx="16" cy="8" r="1.6" fill="currentColor" />
+            <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+            <circle cx="8" cy="16" r="1.6" fill="currentColor" />
+            <circle cx="16" cy="16" r="1.6" fill="currentColor" />
+          </svg>
+          Random
+        </button>
         <span id="midi-status" class="midi-status" role="status" data-state="requesting">
           <span class="midi-dot"></span>
           <span class="midi-text">Connecting to MIDI…</span>

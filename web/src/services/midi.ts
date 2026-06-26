@@ -1,6 +1,5 @@
-// Web MIDI transport for the minilogue xd: requests the current-program SysEx
-// dump and routes incoming SysEx / Control Change / Program Change. Knows nothing
-// about patches — it hands raw program bytes and CC values to the caller.
+// Web MIDI transport: requests the current-program SysEx dump and routes incoming
+// SysEx / Control Change / Program Change. Hands raw bytes to the caller; knows nothing about patches.
 
 import { emit } from '../events/bus'
 import type { AppEventMap } from '../events/types'
@@ -72,34 +71,29 @@ export async function connectMidi(
   }
 
   let refreshTimer: ReturnType<typeof setTimeout> | undefined
-  // What the NEXT requested dump is for: 'full' = connect/refresh (seed live too),
-  // 'program' = program change (leave live needles), 'poll' = periodic SysEx-only refresh
-  // (voice mode etc.), 'idle' = nothing requested. A dump consumes the mode then resets to
-  // 'idle', so a duplicate reply (the dump can arrive on more than one input port) or an
-  // unsolicited dump is ignored instead of re-seeding the live needles.
+  // What the NEXT requested dump is for: 'full' = connect/refresh (seed live), 'program' = program
+  // change (leave live needles), 'poll' = periodic SysEx-only refresh, 'idle' = nothing requested.
+  // A dump consumes the mode then resets to 'idle', so a duplicate reply (the dump can arrive on
+  // more than one input port) or an unsolicited dump is ignored.
   let pendingMode: 'full' | 'program' | 'poll' | 'idle' = 'idle'
 
-  // Connection liveness is derived from real MIDI activity, NOT port.state / statechange:
-  // those are unreliable for power-off (notably Firefox keeps a switched-off port listed —
-  // often still reading 'connected' — and may not fire statechange). A powered-on minilogue xd
-  // streams Active Sensing and answers our dump polls, so silence past ACTIVITY_TIMEOUT means
-  // it's off.
+  // Liveness from real MIDI activity, NOT port.state / statechange (unreliable for power-off;
+  // Firefox keeps a switched-off port listed as 'connected' and may not fire statechange). A
+  // powered-on minilogue xd streams Active Sensing, so silence past ACTIVITY_TIMEOUT means it's off.
   const ACTIVITY_TIMEOUT = 4000
   let lastSeen = 0
   let lastState: MidiStatus['state'] | '' = ''
   let lastDevice: string | undefined
   const attachedInputs = new WeakSet<MIDIInput>()
 
-  // Identify the minilogue xd by port name only — whether it's actually *live* is decided by
-  // MIDI activity (evaluateStatus), since port.state can't be trusted for power-off.
+  // Identify by port name only; liveness is decided by MIDI activity (port.state is untrusted).
   function deviceName(): string | undefined {
     const ports = [...access.inputs.values(), ...access.outputs.values()]
     return ports.find((p) => DEVICE_RE.test(p.name ?? ''))?.name ?? undefined
   }
 
-  // Prefer the SOUND port (it answers/loads program dumps), else any named minilogue
-  // xd port, else every output. The synth only acts on its global channel, so callers
-  // broadcast all 16.
+  // Prefer the SOUND port (answers/loads program dumps), else any named minilogue xd port, else
+  // every output. The synth only acts on its global channel, so callers broadcast all 16.
   function targetOutputs() {
     const all = [...access.outputs.values()]
     const named = all.filter((p) => DEVICE_RE.test(p.name ?? ''))
@@ -115,8 +109,8 @@ export async function connectMidi(
           out.send(Array.from(currentProgramDumpRequest(ch)))
         }
       } catch {
-        // The port can vanish between enumeration and send (a powered-off synth that lingers
-        // in the map — esp. Firefox). Ignore; the activity watchdog reports it as no-device.
+        // A port can vanish between enumeration and send (powered-off synth lingering in the
+        // map, esp. Firefox); the activity watchdog reports it as no-device.
       }
     }
   }
@@ -145,8 +139,7 @@ export async function connectMidi(
 
   function handleSysex(msg: Uint8Array): void {
     if (!isCurrentProgramDump(msg)) return // ignore other SysEx (identity reply…)
-    // Consume the requested mode, then reset to 'idle' so a duplicate reply (the same dump on
-    // a second input port) or an unsolicited dump can't re-seed the live needles.
+    // Consume the mode, then reset to 'idle' so a duplicate or unsolicited dump can't re-seed.
     const mode = pendingMode
     pendingMode = 'idle'
     if (mode === 'idle') return
@@ -155,21 +148,17 @@ export async function connectMidi(
       if (mode === 'poll') handlers.onPoll(prog)
       else handlers.onDump(prog, mode === 'full')
     } catch (err) {
-      // Transient: a dump can arrive corrupt (a fragment lost between the OS and the browser,
-      // an interleaved byte). The 1.5s poll re-requests, so recover silently rather than
-      // flashing a scary message — only real file-drop errors go to the user.
+      // A dump can arrive corrupt (lost/interleaved byte); the 1.5s poll re-requests, so recover silently.
       console.warn(
         `[midi] ignoring bad program dump: ${err instanceof Error ? err.message : String(err)}`,
       )
     }
   }
 
-  // Web MIDI may split a long SysEx dump (≈1179 bytes) across several events, so reassemble
-  // F0→F7 before decoding. State is PER INPUT: the minilogue xd exposes multiple input ports
-  // (SOUND, KBD/KNOB), and a single shared buffer let traffic on one port (CC / active
-  // sensing) interleave a dump on another → a corrupt, short message ("decoded dump too
-  // short"). Each port now reassembles independently, and a non-real-time status byte mid-
-  // SysEx abandons the partial buffer (a lost terminator) instead of corrupting it.
+  // Web MIDI may split a long SysEx dump (≈1179 bytes) across events, so reassemble F0→F7 before
+  // decoding. State is PER INPUT: the minilogue xd exposes multiple input ports (SOUND, KBD/KNOB);
+  // a single shared buffer let traffic on one port interleave a dump on another → "decoded dump
+  // too short". A non-real-time status byte mid-SysEx abandons the partial buffer (lost terminator).
   function makeMessageHandler(): (e: MIDIMessageEvent) => void {
     let sysex: number[] = []
     let inSysex = false
@@ -181,10 +170,9 @@ export async function connectMidi(
       handleSysex(msg)
     }
 
-    // Reassemble F0…F7 a byte at a time, transparent to System Real-Time bytes (0xf8–0xff, e.g.
-    // the Active Sensing the synth streams constantly). Those can arrive standalone OR
-    // interleaved into a dump fragment — appending them corrupts the payload, and dropping the
-    // whole fragment (the old behaviour) loses dump bytes → "decoded dump too short".
+    // Reassemble F0…F7 byte by byte, transparent to System Real-Time bytes (0xf8–0xff, e.g. the
+    // Active Sensing the synth streams). Those can interleave a dump fragment; appending them
+    // corrupts the payload and dropping the whole fragment loses dump bytes → "decoded dump too short".
     const consumeSysex = (data: Uint8Array): void => {
       for (let i = 0; i < data.length; i++) {
         const b = data[i]
@@ -214,8 +202,7 @@ export async function connectMidi(
     return (e: MIDIMessageEvent): void => {
       const data = e.data
       if (!data || data.length === 0) return
-      // Any inbound byte (Active Sensing, CC, dump fragment…) is the synth's heartbeat. Flip to
-      // "connected" the moment it speaks; the watchdog handles the silence → no-device edge.
+      // Any inbound byte is the synth's heartbeat; the watchdog handles the silence → no-device edge.
       lastSeen = Date.now()
       if (lastState !== 'connected') evaluateStatus()
 
@@ -230,15 +217,14 @@ export async function connectMidi(
       if (kind === 0xb0 && data.length >= 3) {
         handlers.onControlChange(data[1], data[2])
       } else if (kind === 0xc0) {
-        // Program change → re-pull program values, but leave the live (synth)
-        // needles where they are: only the program needles should jump.
+        // Program change → re-pull program values but leave the live needles (seedLive false).
         refresh(false)
       }
     }
   }
 
-  // Attach a handler to each input exactly once. Idempotent so the poll can re-scan for ports
-  // that appeared without a statechange (Firefox) without resetting an in-flight reassembly.
+  // Idempotent: the poll re-scans for ports that appeared without a statechange (Firefox) without
+  // resetting an in-flight reassembly.
   function attachInputs(): void {
     for (const input of access.inputs.values()) {
       if (attachedInputs.has(input)) continue
@@ -247,8 +233,7 @@ export async function connectMidi(
     }
   }
 
-  // Connected iff a minilogue xd port is present AND we've heard from it within ACTIVITY_TIMEOUT.
-  // Deduped so the 1s watchdog doesn't spam identical status events.
+  // Connected iff a minilogue xd port is present AND heard from within ACTIVITY_TIMEOUT. Deduped.
   function evaluateStatus(): void {
     const name = deviceName()
     const live = name !== undefined && Date.now() - lastSeen < ACTIVITY_TIMEOUT
@@ -260,8 +245,8 @@ export async function connectMidi(
     emitStatus(state, device !== undefined ? { device } : {})
   }
 
-  // statechange only re-scans inputs + re-pulls — it does NOT drive the status (it's unreliable
-  // for power-off across browsers); the activity watchdog below owns connected/no-device.
+  // statechange only re-scans + re-pulls; it does NOT drive status (unreliable for power-off).
+  // The activity watchdog owns connected/no-device.
   access.onstatechange = () => {
     attachInputs()
     refresh()
@@ -270,16 +255,15 @@ export async function connectMidi(
   attachInputs()
   refresh()
 
-  // Poll the current program so SysEx-only params (voice mode) track the synth, which doesn't
-  // transmit them as CC. Also re-scans for late-appearing ports. No-ops when nothing's connected.
+  // Poll so SysEx-only params (voice mode) track the synth, which doesn't transmit them as CC.
+  // Also re-scans for late-appearing ports.
   const pollInterval = setInterval(() => {
     attachInputs()
     pendingMode = 'poll'
     sendRequest()
   }, 1500)
 
-  // Liveness watchdog: drops to no-device once the synth goes silent (powered off), independent
-  // of port.state / statechange.
+  // Liveness watchdog: drops to no-device once the synth goes silent.
   const statusInterval = setInterval(evaluateStatus, 1000)
 
   function dispose(): void {

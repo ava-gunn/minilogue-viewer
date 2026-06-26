@@ -1,5 +1,3 @@
-// Korg minilogue xd SysEx: request the CURRENT program (edit buffer) and decode
-// its 7-bit-packed payload into the 1024-byte prog_bin layout the parser reads.
 // Protocol: minilogue xd MIDI Implementation Rev 1.01.
 //   Request : F0 42 3g 00 01 51 10 F7                     (g = global MIDI ch)
 //   Response: F0 42 3g 00 01 51 40 <1171 packed bytes> F7 (1179 total)
@@ -42,8 +40,7 @@ export function korgEncode8to7(raw: Uint8Array): Uint8Array {
 }
 
 /** Bytes requesting the current program. The synth only answers on its global
-    MIDI channel; default targets channel 1 (g=0). Pass a channel 0–15, or
-    broadcast across all channels (the receiver matches replies on any). */
+    MIDI channel; channel is 0–15 (g=0 is channel 1). */
 export function currentProgramDumpRequest(channel = 0): Uint8Array {
   return new Uint8Array([
     SYSEX_START,
@@ -55,9 +52,8 @@ export function currentProgramDumpRequest(channel = 0): Uint8Array {
   ])
 }
 
-/** Build a CURRENT PROGRAM DATA DUMP message that loads a 1024-byte prog_bin into the
-    synth's edit buffer: F0 42 3g 00 01 51 40 <7-bit packed prog> F7. Inverse of
-    decodeCurrentProgramDump; matches korg.program_dump in the trainer. */
+/** CURRENT PROGRAM DATA DUMP: F0 42 3g 00 01 51 40 <7-bit packed prog> F7.
+    Matches korg.program_dump in the trainer. */
 export function currentProgramDump(prog: Uint8Array, channel = 0): Uint8Array {
   return new Uint8Array([
     SYSEX_START,

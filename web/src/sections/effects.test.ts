@@ -45,18 +45,17 @@ describe('initEffects (effects focus)', () => {
   })
 
   it('auto-selects the effect edited live', () => {
-    emit('param:change', { section: 'delay', key: 'time', value: 0.1 }) // program
+    emit('param:change', { section: 'delay', key: 'time', value: 0.1 })
     fxLive.length = 0
-    emit('param:live', { section: 'delay', key: 'time', value: 0.9 }) // live edit
+    emit('param:live', { section: 'delay', key: 'time', value: 0.9 })
     expect(last(fxLive, 'time')?.value).toBe(0.9)
   })
 
   it('does not auto-select on a seed where live equals program', () => {
     emit('param:change', { section: 'modFx', key: 'time', value: 0.3 })
     fxChange.length = 0
-    // a dump seed: live == program → selection stays on reverb (default)
     emit('param:live', { section: 'modFx', key: 'time', value: 0.3 })
     emit('param:change', { section: 'reverb', key: 'time', value: 0.7 })
-    expect(last(fxChange, 'time')?.value).toBe(0.7) // still reverb, not modFx
+    expect(last(fxChange, 'time')?.value).toBe(0.7)
   })
 })

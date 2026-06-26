@@ -8,8 +8,7 @@ const styles = `
     flex-direction: column;
     font-family: var(--xd-font);
   }
-  /* Real keyboard-focus ring on the host (the global focus rule can't pierce the shadow
-     root, and a 1px border swap is too weak a cue). */
+  /* Focus ring on the host: the global focus rule can't pierce the shadow root. */
   :host(:focus-visible) {
     outline: 2px solid var(--xd-knob-teal, #2dd4bf);
     outline-offset: 3px;
@@ -79,17 +78,13 @@ class XdDisplay extends HTMLElement {
   #build(): void {
     adoptStyles(this.#shadow, styles)
     const accept = this.getAttribute('accept') ?? DEFAULT_ACCEPT
-    // The file input lives inside the <label>, so a plain click opens the picker via native
-    // label activation — a programmatic input.click() is blocked in some embedded WebViews
-    // (e.g. Ableton's WKWebView). The input stays display:none so it never intercepts drops.
+    // Input inside the <label>: programmatic input.click() is blocked in some WebViews (Ableton's WKWebView).
     this.#shadow.innerHTML = `<label class="screen" part="screen"><div class="name" part="name">INIT PROGRAM</div><div class="meta" part="meta"><span class="index"></span><span class="hint">click or drop a patch</span></div><input type="file" accept="${accept}" /></label>`
     this.#input = this.#shadow.querySelector('input') as HTMLInputElement
     this.setAttribute('role', 'button')
     if (!this.hasAttribute('tabindex')) this.setAttribute('tabindex', '0')
     this.#updateAria('INIT PROGRAM')
 
-    // Mouse: the native <label> opens the picker. Keyboard: fall back to a click() (the host
-    // is role=button/tabindex=0), which works in regular browsers.
     this.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault()

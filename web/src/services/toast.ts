@@ -1,6 +1,4 @@
-// Minimal transient toast notifications — Web Awesome ships no toast/alert, so this is a tiny
-// self-contained one. Used for API/network errors so they pop over the UI instead of sitting
-// inline in the form.
+// Minimal transient toasts — Web Awesome ships no toast/alert.
 
 export type ToastVariant = 'danger' | 'success' | 'info'
 
@@ -24,7 +22,7 @@ export function toast(
 ): void {
   const item = document.createElement('div')
   item.className = `toast toast-${variant}`
-  // Errors interrupt — announce them assertively; other variants are polite via the stack.
+  // role=alert announces errors assertively; other variants are polite via the stack's aria-live.
   if (variant === 'danger') item.setAttribute('role', 'alert')
 
   const text = document.createElement('span')

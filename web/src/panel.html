@@ -1,11 +1,6 @@
-<!-- Shared minilogue xd panel markup. Injected by both the file viewer (main.ts)
-     and the live-MIDI mirror (live.ts) via mountPanel() so the two pages stay in
-     sync. The controls are driven entirely by param:change events; the source
-     (dropped file / connected synth) is wired up separately per page. -->
+<!-- Injected by main.ts and live.ts via mountPanel(); controls are driven by param:change events. -->
 <div class="xd">
-  <!-- Main control panel — a single aligned grid (3 control bands) -->
   <div class="xd-panel">
-    <!-- PERFORMANCE -->
     <section class="grp grp-perf" aria-label="Performance">
       <span class="row-label"></span>
       <xd-knob label="PORTAMENTO" data-section="voice" data-param-key="portamento"></xd-knob>
@@ -22,7 +17,6 @@
       ></xd-led-group>
     </section>
 
-    <!-- VCO 1 / VCO 2 / MULTI ENGINE -->
     <section class="grp grp-vco" aria-label="Oscillators">
       <span class="row-label">VCO 1</span>
       <div class="pair">
@@ -57,7 +51,6 @@
       <xd-knob label="SHAPE" data-section="multi" data-param-key="shape"></xd-knob>
     </section>
 
-    <!-- MIXER -->
     <section class="grp grp-mixer" aria-label="Mixer">
       <span class="grp-label">MIXER</span>
       <xd-knob label="VCO 1" data-section="mixer" data-param-key="vco1"></xd-knob>
@@ -67,7 +60,6 @@
       <xd-knob label="MULTI" data-section="mixer" data-param-key="multi"></xd-knob>
     </section>
 
-    <!-- FILTER -->
     <section class="grp grp-filter" aria-label="Filter">
       <span class="grp-label">FILTER</span>
       <xd-knob label="CUTOFF" data-section="filter" data-param-key="cutoff"></xd-knob>
@@ -80,7 +72,6 @@
       </div>
     </section>
 
-    <!-- AMP EG / EG / LFO -->
     <section class="grp grp-eg" aria-label="Envelopes and LFO">
       <span class="row-label">AMP EG</span>
       <xd-knob label="ATTACK" data-section="ampEnv" data-param-key="attack"></xd-knob>
@@ -104,7 +95,6 @@
       <xd-switch label="TARGET" positions="PITCH,SHAPE,CUTOFF" data-section="lfo" data-param-key="target"></xd-switch>
     </section>
 
-    <!-- EFFECTS + DISPLAY -->
     <section class="grp grp-fx" aria-label="Effects and display">
       <span class="grp-label">EFFECTS</span>
       <div class="pair">
@@ -121,8 +111,7 @@
 
   <footer class="xd-bottom">
     <div class="xd-brand">KORG <strong>minilogue</strong> xd</div>
-    <!-- Needle colour legend (Program / Hardware) — recolours the indicators live. Shown only
-         when a synth is connected over Web MIDI (initShared toggles it on midi:status). -->
+    <!-- Hidden until a synth connects; initShared unhides it on midi:status. -->
     <span class="midi-legend" hidden>
       <label class="swatch-label" title="Program needle color">
         <input type="color" id="color-prog" value="#2dd4bf" />Program

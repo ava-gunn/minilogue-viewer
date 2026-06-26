@@ -121,7 +121,6 @@ describe('outputsToRawById', () => {
     expect(raw.sync).toBe(1)
     expect(raw.ring).toBe(0)
 
-    // The id-keyed path reconstructs the identical patch as the tensor path.
     expect(rawByIdToPatch(raw)).toEqual(outputsToPatch(out))
   })
 })

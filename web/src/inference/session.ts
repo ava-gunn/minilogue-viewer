@@ -1,9 +1,3 @@
-// onnxruntime-web session: loaded once, run on demand. WASM backend, single-threaded
-// (no cross-origin isolation needed). The .wasm assets are served from /ort/ (copied by
-// vite-plugin-static-copy); the model from /models/ (public/).
-
-// CPU/wasm-only build (no WebGPU/JSEP). Its glue is bundled, so only the .wasm binary
-// is fetched at runtime — see vite.config.ts (optimizeDeps.exclude keeps it inlined).
 import * as ort from 'onnxruntime-web/wasm'
 import { INPUT_NAME, N_FRAMES, N_MELS, OUTPUT_NAMES } from './contract'
 

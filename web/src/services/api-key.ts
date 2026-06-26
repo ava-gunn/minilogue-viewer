@@ -1,5 +1,4 @@
-// Gemini credentials live only in this browser's localStorage — the key is the user's own
-// AI Studio key, sent only to Google by services/gemini.ts, never to our backend.
+// The key is the user's own AI Studio key, sent only to Google by services/gemini.ts, never to our backend.
 
 import { DEFAULT_MODEL } from './gemini'
 

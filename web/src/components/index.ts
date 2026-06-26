@@ -1,4 +1,3 @@
-// Registers all custom synth controls as a side effect.
 import './xd-knob'
 import './xd-switch'
 import './xd-wave-selector'

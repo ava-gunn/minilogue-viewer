@@ -9,14 +9,8 @@ const isSlot = (s: string): s is Slot =>
 type Layer = Record<Slot, { time?: ParamChange; depth?: ParamChange }>
 const emptyLayer = (): Layer => ({ modFx: {}, delay: {}, reverb: {} })
 
-/**
- * Effects focus. The synth's TIME/DEPTH knobs are shared across the three
- * effect slots; the panel mirrors that with one TIME/DEPTH pair (section "fx").
- * Each slot's time/depth arrives as param:change (program) and param:live
- * (synth, from CC 28/29 · 105/106 · 108/109); this re-emits the active slot's
- * values under section "fx". The active slot follows a click (fx:select) or a
- * live edit (a CC whose value differs from the program).
- */
+// Slot time/depth arrives via CC 28/29 (modFx) · 105/106 (delay) · 108/109 (reverb);
+// the active slot is re-emitted under section "fx" onto the shared TIME/DEPTH knobs.
 export function initEffects(): void {
   let active: Slot = 'reverb'
   const prog = emptyLayer()
@@ -55,8 +49,7 @@ export function initEffects(): void {
   on('param:live', (c) => {
     if (isSlot(c.section) && (c.key === 'time' || c.key === 'depth')) {
       live[c.section][c.key] = c
-      // A genuine live edit (differs from the program) selects that slot; a dump
-      // seed (live == program) leaves the current selection alone.
+      // A live value differing from the program selects that slot; a dump seed (live == program) does not.
       const p = prog[c.section][c.key]
       if (!p || p.value !== c.value) active = c.section
       emitFx()

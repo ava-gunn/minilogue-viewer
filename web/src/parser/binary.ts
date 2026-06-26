@@ -1,5 +1,4 @@
-// Reads a 1024-byte prog_bin blob into raw integer fields. Offsets are from the
-// Korg minilogue xd program data structure (gekart gist + oxur crate).
+// Offsets are from the Korg minilogue xd program data structure (gekart gist + oxur crate).
 
 export interface RawPatch {
   name: string

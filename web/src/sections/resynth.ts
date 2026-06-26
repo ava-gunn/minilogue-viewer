@@ -1,10 +1,6 @@
-// Re-synthesis view controller: pick the built-in model or Gemini, upload + audition an
-// audio clip (waveform + play), generate a patch onto the shared Korg panel, then submit
-// thumbs-up/down feedback. Drives the panel through the same patch:load event the viewer
-// uses; the engines converge on a rawById map (see inference/decode + gemini/schema).
+// Both engines (built-in model, Gemini) converge on a rawById map; see inference/decode + gemini/schema.
 
-// Loaded lazily on first Resynthesis click — its CSS rides along in this chunk so the viewer's
-// initial bundle stays free of the form styles.
+// CSS rides along in this lazily-loaded chunk so the viewer's initial bundle stays free of the form styles.
 import '../styles/resynth.css'
 
 import { emit, on } from '../events/bus'
@@ -57,8 +53,7 @@ let lastRationale: string | undefined
 let lastAnalysis: Record<string, string> | undefined
 let objectUrl: string | undefined
 
-// Render the rationale plus Gemini's structured audio analysis (one line per heard trait) into
-// the result box; .resynth-result uses white-space: pre-line so the newlines show.
+// .resynth-result uses white-space: pre-line, so the newlines below render as line breaks.
 const ANALYSIS_LABELS: Record<string, string> = {
   sound_type: 'Type',
   pitch: 'Pitch',
@@ -139,16 +134,13 @@ export function initResynth(link: SynthLink): void {
   }
   const engine = (): Engine => (geminiRadio?.checked ? 'gemini' : 'builtin')
 
-  // Load-to-hardware: the shared synth link supplies the live program (template) + sendProgram.
   let connected = false
-  // The button only shows when an xd is connected; enabled once we also have a captured
-  // template (the synth's live program) and a generated patch.
   const updateLoad = (): void => {
     loadBtn?.toggleAttribute('hidden', !connected)
-    if (loadBtn) loadBtn.disabled = !(connected && link.getTemplate() && rawById)
+    if (loadBtn)
+      loadBtn.disabled = !(connected && link.getTemplate() && rawById)
   }
 
-  // ---- engine selector + credentials ---------------------------------------
   if (modelSel && modelSel.options.length === 0) {
     for (const m of MODELS) {
       const opt = document.createElement('option')
@@ -170,19 +162,16 @@ export function initResynth(link: SynthLink): void {
   keyInput?.addEventListener('input', () => setApiKey(keyInput.value.trim()))
   modelSel?.addEventListener('change', () => setModel(modelSel.value))
 
-  // ---- audio preview (waveform + audition) ---------------------------------
-  // Whether the canvas holds a real decoded waveform (vs a flat baseline / nothing) — we only
-  // ship the screenshot to Gemini when it's meaningful — plus the clip duration for envelope scaling.
+  // waveformOk gates whether the screenshot is sent to Gemini; waveformDuration scales the envelope.
   let waveformOk = false
   let waveformDuration = 0
-  // Whether drawWaveform has finished for the current file (success or fail) — gates Generate so
-  // the waveform screenshot is ready before we send.
+  // Gates Generate until drawWaveform has finished, so the screenshot is ready before we send.
   let waveformReady = false
 
-  // Generate is enabled when there's a ready audio waveform OR a non-empty text description.
   const updateGenerate = (): void => {
     const hasText = !!textInput?.value.trim()
-    if (generateBtn) generateBtn.disabled = !((file && waveformReady) || hasText)
+    if (generateBtn)
+      generateBtn.disabled = !((file && waveformReady) || hasText)
   }
 
   async function drawWaveform(f: File): Promise<void> {
@@ -227,8 +216,7 @@ export function initResynth(link: SynthLink): void {
     waveformOk = true
   }
 
-  // Snapshot the rendered waveform as a base64 PNG (no data: prefix) for Gemini — the visible
-  // amplitude envelope is exactly what it needs to read the AMP EG correctly.
+  // Base64 PNG of the rendered waveform, no data: prefix (Gemini wants the bare payload).
   const waveformPng = (): string | undefined => {
     if (!canvas || !waveformOk) return undefined
     try {
@@ -247,8 +235,7 @@ export function initResynth(link: SynthLink): void {
     if (progress) progress.style.width = '0%'
     preview?.removeAttribute('hidden')
     void drawWaveform(f).finally(() => {
-      // Waveform ready (or decode failed) → safe to generate. Enable even on failure so the
-      // audio can still be sent; the screenshot is simply omitted when there's nothing to grab.
+      // Enable even on decode failure: the audio can still be sent, just without the screenshot.
       waveformReady = true
       updateGenerate()
     })
@@ -281,8 +268,7 @@ export function initResynth(link: SynthLink): void {
     }
   })
 
-  // ---- audio / text input (mutually exclusive) -----------------------------
-  // Whichever input has content disables the other.
+  // Audio and text inputs are mutually exclusive: content in one disables the other.
   const syncInputs = (): void => {
     const hasText = !!textInput?.value.trim()
     if (textInput) textInput.disabled = !!file
@@ -301,7 +287,6 @@ export function initResynth(link: SynthLink): void {
     }
     audio?.removeAttribute('src')
     if (filename) filename.textContent = ''
-    // Swap back: hide the waveform, restore the drop.
     preview?.setAttribute('hidden', '')
     drop?.removeAttribute('hidden')
     feedback?.setAttribute('hidden', '')
@@ -320,10 +305,7 @@ export function initResynth(link: SynthLink): void {
     waveformReady = false
     if (filename) filename.textContent = f.name
     feedback?.setAttribute('hidden', '')
-    // The waveform replaces the drop in-place; hide the drop, loadPreview shows the preview.
     drop?.setAttribute('hidden', '')
-    // syncInputs disables the text box; Generate stays off until the waveform renders (then
-    // loadPreview's drawWaveform().finally re-enables it), so the screenshot is always included.
     syncInputs()
     loadPreview(f)
     setStatus('')
@@ -350,7 +332,6 @@ export function initResynth(link: SynthLink): void {
   textInput?.addEventListener('input', syncInputs)
   clearBtn?.addEventListener('click', clearAudio)
 
-  // ---- generate patch ------------------------------------------------------
   generateBtn?.addEventListener('click', async () => {
     const text = textInput?.value.trim() ?? ''
     const f = file
@@ -417,8 +398,7 @@ export function initResynth(link: SynthLink): void {
           formatResult(rationale, analysis) ||
           'Patch loaded — try it on your minilogue xd.'
       }
-      // A pure text patch has no audio to contribute — show the result but hide the thumbs row
-      // (and skip the captcha). Audio patches keep the full feedback/contribution flow.
+      // A pure text patch has no audio to contribute: hide the thumbs row and skip the captcha.
       feedback?.removeAttribute('hidden')
       feedbackRow?.toggleAttribute('hidden', useText)
       if (!useText && !isLocalhost() && turnstileBox) {
@@ -437,9 +417,7 @@ export function initResynth(link: SynthLink): void {
     }
   })
 
-  // ---- feedback: contribute the patch -------------------------------------
-  // 'as-is' uploads the generated patch; 'adjusted' uploads the user's live hardware program
-  // (the generated patch + their knob tweaks), read back from the connected XD.
+  // 'adjusted' uploads the live hardware program (generated patch + knob tweaks) read back from the XD.
   const submit = async (kind: Rating): Promise<void> => {
     if (!file) return
     let submitRaw = rawById
@@ -460,15 +438,16 @@ export function initResynth(link: SynthLink): void {
     if (mineBtn) mineBtn.disabled = true
     const markDone = (): void => {
       setStep('feedback')
-      stepEls.find((li) => li.dataset.step === 'feedback')?.classList.add('done')
+      stepEls
+        .find((li) => li.dataset.step === 'feedback')
+        ?.classList.add('done')
     }
     const reenable = (): void => {
       if (asIsBtn) asIsBtn.disabled = false
       if (mineBtn) mineBtn.disabled = false
     }
 
-    // On localhost the local daemon loads the params on the connected XD, records, scores the
-    // match, and folds verified patches into the built-in model's training set.
+    // On localhost the daemon loads, records, and scores on the XD, folding verified patches into training.
     if (isLocalhost()) {
       setStatus(
         kind === 'adjusted'
@@ -522,7 +501,9 @@ export function initResynth(link: SynthLink): void {
       })
       resetTurnstile()
       markDone()
-      setStatus(`Thanks! ${kind === 'adjusted' ? 'Your version' : 'Feedback'} sent (${id}).`)
+      setStatus(
+        `Thanks! ${kind === 'adjusted' ? 'Your version' : 'Feedback'} sent (${id}).`,
+      )
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       setStatus('')
@@ -533,14 +514,10 @@ export function initResynth(link: SynthLink): void {
   asIsBtn?.addEventListener('click', () => void submit('as-is'))
   mineBtn?.addEventListener('click', () => void submit('adjusted'))
 
-  // ---- load to hardware ----------------------------------------------------
-  // MIDI status + live mirroring are owned by the always-loaded viewer (the shared synth link);
-  // here we only track connection state for the Load / "Mine's better" buttons and send the
-  // generated patch via the link.
+  // MIDI status + live mirroring are owned by the viewer's shared synth link; we only track connection here.
   on('midi:status', ({ state }) => {
     connected = state === 'connected'
     updateLoad()
-    // "Mine's better" reads the live program off the XD, so it only makes sense when connected.
     mineBtn?.toggleAttribute('hidden', !connected)
   })
   loadBtn?.addEventListener('click', () => {
@@ -554,7 +531,6 @@ export function initResynth(link: SynthLink): void {
     )
   })
 
-  // initial state
   syncEngine()
   setStep('upload')
   updateLoad()

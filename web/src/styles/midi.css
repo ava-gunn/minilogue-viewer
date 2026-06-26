@@ -1,4 +1,3 @@
-/* Compact MIDI connection bar above the panel (combined viewer + live page). */
 .midi-bar {
   display: flex;
   flex-wrap: wrap;
@@ -7,11 +6,9 @@
   inline-size: var(--xd-min-w);
   max-inline-size: min(20in, 100%);
   margin-inline: auto;
-  /* border-box so the inline-size cap includes padding (matches #app / .xd); without it
-     the fixed inline-size + padding overflows #app and the right-aligned refresh juts out. */
+  /* border-box so the inline-size cap includes padding (matches #app / .xd); else it overflows #app. */
   box-sizing: border-box;
-  /* Inline padding matches the synth chassis's inner padding (.xd uses --wa-space-m),
-     so the right-aligned status + refresh line up with the synth's darker interior. */
+  /* Inline padding matches the synth chassis inner padding (.xd uses --wa-space-m). */
   padding: var(--wa-space-s, 0.5rem) var(--wa-space-m, 1rem);
   font-family: var(--wa-font-family-body, system-ui, sans-serif);
 }
@@ -24,7 +21,6 @@
   color: var(--wa-color-text-normal, #e0e0e6);
 }
 
-/* Right-align the connection indicator in the viewer header (matches the resynth bar). */
 .midi-bar #midi-status {
   margin-inline-start: auto;
 }
@@ -63,9 +59,6 @@
   border-color: var(--wa-color-text-quiet, #8a8a93);
 }
 
-/* Legend + colour pickers for the two indicators, in the panel footer (xd-bottom).
-   margin-inline-start: auto pushes it to the right edge. Clicking a swatch opens the
-   OS colour picker; the choice updates --xd-knob-teal / --xd-knob-live live. */
 .midi-legend {
   display: inline-flex;
   gap: var(--wa-space-m, 1rem);
@@ -73,7 +66,7 @@
   font-size: 0.78rem;
   color: var(--wa-color-text-quiet, #8a8a93);
 }
-/* Outrank the display rule above so the hidden attribute (no synth connected) wins. */
+/* Outrank the display rule above so [hidden] (no synth connected) wins. */
 .midi-legend[hidden] {
   display: none;
 }

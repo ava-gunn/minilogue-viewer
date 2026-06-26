@@ -7,9 +7,14 @@ embedding.
 
 The discrete heads are argmax-decoded at inference (non-differentiable), so during training
 the bridge feeds the proxy a per-group *softmax* (a soft one-hot, temperature-annealable);
-ONNX export keeps the hard argmax. An optional auxiliary loss (MSE of the bridged vector vs
-the clip's true param vector, --aux-weight, default 0) can pull the heads toward the known
-ground truth. Saves a raw encoder state_dict that `training.export --checkpoint` consumes.
+ONNX export keeps the hard argmax. That soft one-hot is out-of-distribution for the proxy
+(trained on hard one-hots), so the embedding loss gives the categorical heads a weak gradient
+— hence a supervised parameter loss (L1 on continuous + per-group CE on discrete + BCE on
+boolean, from the sweep's ground-truth params), split by type (Combes et al. Mix/Switch): the
+continuous term follows the schedule (Switch decays it so the embedding loss owns continuous
+values late, since over-fitting them sank direct regression), while the categorical term
+(discrete CE + boolean BCE) stays on throughout. Saves a raw encoder state_dict that
+`training.export --checkpoint` consumes.
 
     python -m training.encoder_train --data /Volumes/Samples/training/xd --proxy runs/proxy.pt --out runs/encoder.pt
     python -m training.encoder_train --smoke    # no data/proxy file: exercise the gradient path
@@ -57,22 +62,23 @@ def _load_proxy(path: Path, device: torch.device) -> torch.nn.Module:
 
 
 def _param_loss(cont, disc_logits, boolean, true_cont, true_disc, true_bool):
-    """Supervised parameter loss (Combes et al.): L1 on continuous + mean per-group
-    cross-entropy on discrete logits + BCE on boolean — available because the Sobol sweep
-    carries exact ground-truth params."""
+    """Supervised parameter loss (Combes et al.), split by type for separate scheduling:
+    returns (continuous_l1, categorical_loss), where categorical = mean per-group cross-entropy
+    on discrete logits + BCE on boolean. Both come from the Sobol sweep's exact ground-truth
+    params; the split lets the continuous term decay while the categorical term persists."""
     ce = disc_logits.new_zeros(())
     off = 0
     for g, card in enumerate(schema.DISCRETE_CARDINALITIES):
         ce = ce + F.cross_entropy(disc_logits[:, off : off + card], true_disc[:, g])
         off += card
     ce = ce / len(schema.DISCRETE_CARDINALITIES)
-    return F.l1_loss(cont, true_cont) + ce + F.binary_cross_entropy(boolean, true_bool)
+    return F.l1_loss(cont, true_cont), ce + F.binary_cross_entropy(boolean, true_bool)
 
 
 def train(
     encoder, proxy, mels, emb, params, *,
-    temp, temp_final, schedule, aux_weight, embed_warmup, epochs, batch, lr, val_frac, device, seed,
-    is_eval=None,
+    temp, temp_final, schedule, aux_weight, disc_weight=None, embed_warmup, epochs, batch, lr,
+    val_frac, device, seed, is_eval=None,
 ) -> float:
     n = len(mels)
     if is_eval is not None and bool(is_eval.any()):  # held-out presets are the val set
@@ -103,21 +109,25 @@ def train(
         c, d, b = encoder(melbatch(idx))
         return float((proxy(proxy_input(c, d, b, temperature)) * emb[idx]).sum(-1).mean())
 
+    dw = aux_weight if disc_weight is None else disc_weight
     report_idx = val_idx if val_idx else tr_idx[: min(512, len(tr_idx))]
     label = "val" if val_idx else "train"
-    print(f"{label} cosine @init: {cosine_on(report_idx, temp):.4f}  "
-          f"(train {len(tr_idx)}, val {len(val_idx)}, schedule={schedule}, aux={aux_weight})")
+    print(f"{label} cosine @init: {cosine_on(report_idx, temp):.4f}  (train {len(tr_idx)}, "
+          f"val {len(val_idx)}, schedule={schedule}, aux_cont={aux_weight}, aux_cat={dw})")
     best = -1.0
     for ep in range(1, epochs + 1):
         prog = (ep - 1) / max(1, epochs - 1)
         t = temp + (temp_final - temp) * prog
-        # Param-loss-first -> embedding (Combes et al. Mix/Switch): ramp the embedding loss in
-        # over the warmup; Mix keeps the param loss, Switch decays it to 0.
-        if schedule == "none" or aux_weight == 0:
-            ew, pw = 1.0, aux_weight
+        # Param-loss-first -> embedding (Combes et al. Mix/Switch), split by type: ramp the
+        # embedding loss in over the warmup; the continuous L1 follows the schedule (Switch
+        # decays it to 0, Mix keeps it), while the categorical term (discrete CE + boolean BCE)
+        # stays on throughout — the bridge's soft one-hots give it a weak embedding gradient.
+        if schedule == "none":
+            ew, pw_cont, pw_cat = 1.0, 0.0, 0.0
         else:
             ew = min(1.0, prog / embed_warmup) if embed_warmup > 0 else 1.0
-            pw = aux_weight * (1.0 - prog) if schedule == "switch" else aux_weight
+            pw_cont = aux_weight * (1.0 - prog) if schedule == "switch" else aux_weight
+            pw_cat = dw
         encoder.train()
         order = torch.randperm(len(tr_idx), generator=torch.Generator().manual_seed(seed + ep))
         for b in order.split(batch):
@@ -127,14 +137,15 @@ def train(
             loss = bo.new_zeros(())
             if ew:
                 loss = loss + ew * cosine_loss(proxy(proxy_input(c, d, bo, t)), emb[idx])
-            if pw:
-                loss = loss + pw * _param_loss(c, d, bo, true_cont[idx], true_disc[idx], true_bool[idx])
+            if pw_cont or pw_cat:
+                cont_l, cat_l = _param_loss(c, d, bo, true_cont[idx], true_disc[idx], true_bool[idx])
+                loss = loss + pw_cont * cont_l + pw_cat * cat_l
             loss.backward()
             opt.step()
         v = cosine_on(report_idx, temp_final)
         best = max(best, v)
         if ep % max(1, epochs // 10) == 0 or ep == epochs:
-            print(f"epoch {ep:>3}: {label} cosine {v:.4f}  (ew={ew:.2f} pw={pw:.2f})")
+            print(f"epoch {ep:>3}: {label} cosine {v:.4f}  (ew={ew:.2f} pc={pw_cont:.2f} pk={pw_cat:.2f})")
     return best
 
 
@@ -175,8 +186,13 @@ def main() -> None:
     ap.add_argument("--temperature", type=float, default=1.0, help="discrete softmax temp at epoch 1")
     ap.add_argument("--temperature-final", type=float, default=None, help="anneal target (default: no anneal)")
     ap.add_argument("--schedule", choices=["none", "mix", "switch"], default="mix",
-                    help="param->embedding loss schedule (Combes et al.): mix keeps param loss late, switch drops it")
-    ap.add_argument("--aux-weight", type=float, default=1.0, help="parameter-loss weight (0 = embedding only)")
+                    help="continuous param->embedding schedule (Combes et al.): mix keeps continuous L1 late, "
+                         "switch decays it to 0; the categorical term (--disc-weight) persists either way")
+    ap.add_argument("--aux-weight", type=float, default=1.0,
+                    help="continuous-L1 param-loss weight (0 = no continuous supervision); follows --schedule")
+    ap.add_argument("--disc-weight", type=float, default=None,
+                    help="categorical (discrete CE + boolean BCE) loss weight; stays on across the schedule "
+                         "(default: same as --aux-weight). Unlike --aux-weight it does NOT decay under switch")
     ap.add_argument("--embed-warmup", type=float, default=0.33, help="fraction of training to ramp embedding loss 0->1")
     ap.add_argument("--device", default=None)
     ap.add_argument("--seed", type=int, default=0)
@@ -200,8 +216,8 @@ def main() -> None:
     best = train(
         encoder, _load_proxy(args.proxy, device), mels, emb, params,
         temp=args.temperature, temp_final=args.temperature_final or args.temperature,
-        schedule=args.schedule, aux_weight=args.aux_weight, embed_warmup=args.embed_warmup,
-        epochs=args.epochs, batch=args.batch, lr=args.lr,
+        schedule=args.schedule, aux_weight=args.aux_weight, disc_weight=args.disc_weight,
+        embed_warmup=args.embed_warmup, epochs=args.epochs, batch=args.batch, lr=args.lr,
         val_frac=args.val_frac, device=device, seed=args.seed, is_eval=is_eval,
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)

@@ -38,3 +38,6 @@ training/data/contrib/
 training/eval/set/
 training/.daemon.pid
 training/.daemon.log
+
+# local-only working files (audio targets, patch libraries, scratch notes), kept out of git
+/_local/

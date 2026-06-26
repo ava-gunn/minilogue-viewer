@@ -1,7 +1,6 @@
 import './styles/main.css'
 import './styles/embed.css'
 
-// Web Awesome components used by the shared panel + status badge + library drawer.
 import '@awesome.me/webawesome/dist/components/tooltip/tooltip.js'
 import '@awesome.me/webawesome/dist/components/details/details.js'
 import '@awesome.me/webawesome/dist/components/badge/badge.js'
@@ -14,9 +13,7 @@ import { initLibrary, initLoad } from './sections/load'
 import { initShared } from './sections/shared'
 import { initEmbed } from './services/host-bridge'
 
-// Viewer-only build for the Ableton extension: the shared Korg panel + patch-file loading,
-// with NO inference (ONNX) and NO Web MIDI (unavailable in the embedded WebView). The
-// Resynthesis link opens the deployed app in the system browser via the host bridge.
+// Ableton embed: no Web MIDI / ONNX in the WebView; Resynthesis opens the deployed app via the host bridge.
 mountPanel()
 initShared()
 initEffects()

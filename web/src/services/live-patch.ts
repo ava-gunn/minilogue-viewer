@@ -1,12 +1,6 @@
-// Live panel mirror. Two layers feed the panel:
-//   • program layer  — emitted as patch:load (file load OR SysEx dump), fanned
-//     out to param:change by sections/shared. This is the loaded program value.
-//   • live layer      — emitted here as param:live: the synth's ACTUAL current
-//     control positions. Seeded from each dump (actual == program at that
-//     instant) then updated per incoming Control Change as knobs move.
-// Each CC writes one field of a mutable RawPatch and is run back through the
-// existing parsePatch + PARAMS descriptors, so live edits render identically to
-// a loaded file. CC map: minilogue xd MIDI Implementation Rev 1.01.
+// Two layers: program layer (patch:load, from file or SysEx dump) and live layer (param:live,
+// the synth's actual control positions, updated per incoming Control Change).
+// CC map: minilogue xd MIDI Implementation Rev 1.01.
 
 import { emit } from '../events/bus'
 import { type RawPatch, readRawPatch } from '../parser/binary'
@@ -46,8 +40,8 @@ function applyMultiShape(raw: RawPatch, value: number): void {
 function applyMultiSelect(raw: RawPatch, v: number): void {
   const type = MULTI_TYPE[raw.multiType] ?? 'NOISE'
   const count = MULTI_ENGINE_COUNT[type]
-  // Each sub-type owns a 128/count-wide band of the CC range. (round() over
-  // count-1 collided 72 & 80 onto FAT2 and skipped CREEP for VPM's 16 types.)
+  // Each sub-type owns a 128/count-wide band. (round() over count-1 collided 72 & 80 onto FAT2
+  // and skipped CREEP for VPM's 16 types.)
   const index = Math.min(count - 1, Math.floor((v * count) / 128))
   if (type === 'VPM') raw.selectVPM = index
   else if (type === 'USER') raw.selectUser = index
@@ -428,20 +422,12 @@ export function createLivePatch(): LivePatch {
     )
   }
 
-  // A dump sets the program layer + the raw baseline for CC decoding, but never seeds the
-  // live (synth) layer: a dump carries the program's stored values, not the physical knob
-  // positions. A control's synth needle stays hidden until an actual CC (a physical move)
-  // tells us where that knob really is.
   function loadDump(prog: Uint8Array): void {
     raw = readRawPatch(prog)
     const patch = parsePatch(raw)
-    // Program layer (drives the existing fanout → param:change).
     emit('patch:load', { patch, index: 0, total: 1 })
   }
 
-  // Set only the CC-decode baseline from a dump — no program/live emit. The re-synth page
-  // uses this: its program needles show the GENERATED patch, so a synth dump must not
-  // overwrite them, but incoming CCs still need a raw baseline to decode against.
   function setBaseline(prog: Uint8Array): void {
     raw = readRawPatch(prog)
   }
@@ -454,13 +440,11 @@ export function createLivePatch(): LivePatch {
     const spec = CC_TABLE[cc]
     const lsb = pendingLsb
     pendingLsb = 0
-    // Ignore CCs until a snapshot establishes the full program state.
     if (!spec || !raw) return
 
     spec.apply(raw, value, lsb)
     const patch = parsePatch(raw)
-    // The multi engine couples select/shape/type, so refresh the whole section;
-    // otherwise emit only the control that changed.
+    // The multi engine couples select/shape/type, so refresh the whole section.
     for (const d of PARAMS) {
       const match =
         spec.section === 'multi'
@@ -470,8 +454,6 @@ export function createLivePatch(): LivePatch {
     }
   }
 
-  // No-op: the live (synth) needles update only from a Control Change (a physical move), so
-  // there's nothing to seed from a periodic dump. Kept so the MIDI poll handler stays wired.
   function pollDump(): void {}
 
   return {

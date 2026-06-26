@@ -10,9 +10,7 @@ const MIDI_MESSAGES: Record<string, string> = {
   error: 'MIDI error.',
 }
 
-/** Drive the shared MIDI status indicator (#midi-status dot/text + #midi-refresh
-    visibility) from midi:status events. Used by both the viewer and the
-    re-synthesis page. Call before connecting MIDI so it catches the first event. */
+// Call before connecting MIDI so it catches the first status event.
 export function initMidiStatus(): void {
   const status = document.getElementById('midi-status')
   const text = status?.querySelector('.midi-text')

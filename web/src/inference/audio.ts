@@ -1,7 +1,3 @@
-// Decode an audio file to the fixed-length mono signal the model expects. An
-// OfflineAudioContext does decode + resample + downmix-to-mono + crop/pad to N_SAMPLES
-// in a single render pass (the source buffer is resampled to the context rate).
-
 import { N_SAMPLES, SAMPLE_RATE } from './contract'
 
 export async function decodeToSamples(file: File): Promise<Float32Array> {

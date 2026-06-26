@@ -15,10 +15,7 @@ export interface ParamChange {
   display?: string
 }
 
-/**
- * The full set of application events. Read-only viewer: events flow from a
- * dropped file toward the panel; there are no editing/output events.
- */
+/** Read-only viewer: events flow from a dropped file toward the panel; no editing/output events. */
 export interface AppEventMap {
   'file:dropped': { file: File }
   'audio:dropped': { file: File }

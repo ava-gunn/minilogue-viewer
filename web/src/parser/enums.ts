@@ -1,5 +1,4 @@
-// Integer → meaning maps for the program-stored (prog_bin) enum fields.
-// Indexed by the raw byte value. Sources: gekart gist + oxur crate (see plan).
+// Indexed by the raw byte value. Sources: gekart gist + oxur crate.
 
 import type {
   FilterEgTarget,
@@ -16,9 +15,10 @@ export const VCO_WAVE: readonly Wave[] = ['SQR', 'TRI', 'SAW']
 /** MULTI TYPE @38. */
 export const MULTI_TYPE: readonly MultiType[] = ['NOISE', 'VPM', 'USER']
 
-/** VOICE MODE TYPE @21: 0=None,1=ARP,2=CHORD,3=UNISON,4=POLY (None → POLY). */
+/** VOICE MODE TYPE @21 (Korg MIDI Impl): 0=ARP LATCH, 1=ARP, 2=CHORD, 3=UNISON, 4=POLY.
+ *  POLY is 4 (not 0); index 0 is the latched arpeggiator. Latch collapses to ARP here. */
 export const VOICE_MODE: readonly VoiceMode[] = [
-  'POLY',
+  'ARP',
   'ARP',
   'CHORD',
   'UNISON',
@@ -62,8 +62,8 @@ export const MULTI_VPM: readonly string[] = [
   'FAT2',
   'AIR1',
   'AIR2',
-  'DCY1',
-  'DCY2',
+  'DECAY1',
+  'DECAY2',
   'CREEP',
   'THROAT',
 ]

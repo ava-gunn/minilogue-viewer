@@ -1,6 +1,5 @@
-// Lazy Cloudflare Turnstile loader for the public contribution flow. Renders a managed
-// widget into a container and exposes its verification token. No-op (token undefined) when
-// VITE_TURNSTILE_SITE_KEY is unset, so dev/local builds don't require a captcha.
+// Lazy Cloudflare Turnstile loader. No-op (token undefined) when VITE_TURNSTILE_SITE_KEY is
+// unset, so dev/local builds don't require a captcha.
 
 const SITE_KEY = (import.meta.env as Record<string, string | undefined>)
   .VITE_TURNSTILE_SITE_KEY

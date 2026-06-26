@@ -1,8 +1,5 @@
-// Local verify-and-tune bridge. When the app runs on localhost, a thumbs-up POSTs the
-// source audio + predicted params to the on-machine daemon (training/daemon.py), which
-// loads the patch on the connected XD, records, scores the resynthesis, and — if it
-// matches — promotes it to the verified training set (retraining the built-in model in
-// batches). In production this path is skipped in favor of the remote contribution.
+// Localhost-only verify-and-tune bridge: POSTs to the on-machine daemon (training/daemon.py),
+// which loads the patch on the connected XD and scores the resynthesis. Skipped in production.
 
 import type { Engine } from './contribute'
 

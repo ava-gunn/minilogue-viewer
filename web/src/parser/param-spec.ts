@@ -1,12 +1,7 @@
-// Declarative parameter spec — the single source of truth for the shared ML schema.
 // Byte offsets and bit widths mirror the reader in ./binary.ts (enforced by
 // schema-gen.test.ts via a round-trip); discrete value orderings are imported from
 // ./enums.ts. `pnpm build:schema` serializes this to ../../schema/, consumed by both
 // the browser inference layer and the Python trainer.
-//
-// The model predicts in raw parameter space: inference assembles a RawPatch from the
-// output (denormalize continuous, argmax discrete, threshold boolean) and runs the
-// existing parsePatch(), so every transform curve is reused rather than reimplemented.
 //
 // modFxType (offset 89) is intentionally excluded — parsePatch ignores it, so it does
 // not affect the reconstructed patch and has no UI to validate against.
@@ -251,8 +246,6 @@ export const PARAM_SPEC: readonly ParamSpec[] = [
   cont('reverb_depth', 'reverbDepth', 'reverb.depth', 109, 10, 'reverb'),
 ]
 
-// ---- Serialized schema shapes (snake_case, Python-friendly) ----------------
-
 export interface ParamRecord {
   id: string
   field: string
@@ -319,10 +312,9 @@ export function buildParamsSchema(): ParamsSchema {
   }
 }
 
-// Audio preprocessing spec — shared by the browser inference layer and the Python
-// trainer. Framing convention is center=False; n_frames is derived (see contract.ts /
-// schema.py). Value-level parity between the two mel implementations is pinned by the
-// golden-vector test in Phase 4c.
+// Shared by the browser inference layer and the Python trainer. Framing is
+// center=False; n_frames is derived (see contract.ts / schema.py). Mel parity
+// pinned by the golden-vector test.
 export const AUDIO_SPEC = {
   sample_rate: 44100,
   duration_s: 1,

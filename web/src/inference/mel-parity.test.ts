@@ -5,9 +5,8 @@ import { describe, expect, it } from 'vitest'
 import { N_FRAMES, N_MELS } from './contract'
 import { logMel } from './mel'
 
-// Pins mel.ts against the Python golden (training/data/mel.py) so the encoder gets the
-// same log-mel in training (numpy float64 FFT) and inference (this float32 FFT). The two
-// differ only in the FFT's internal precision; the tolerance covers that gap.
+// Pins mel.ts against the Python golden (training/data/mel.py); diffs are float32 (this
+// FFT) vs float64 (numpy) precision only, which the tolerance covers.
 interface Golden {
   signal: { sample_rate: number; length: number; tones: [number, number][] }
   mel: number[]

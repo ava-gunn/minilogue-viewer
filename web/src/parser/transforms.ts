@@ -1,5 +1,4 @@
-// Raw (prog_bin) value → meaningful unit transforms. Formulas from the gekart
-// gist, cross-checked against the oxur crate (see plan reference links).
+// Formulas from the gekart gist, cross-checked against the oxur crate.
 
 export const clamp01 = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n)
 
@@ -9,11 +8,9 @@ export const norm10 = (v: number): number => clamp01(v / 1023)
 /** 7-bit raw (0..127) → normalized 0..1. */
 export const norm7 = (v: number): number => clamp01(v / 127)
 
-// VCO pitch curve, calibrated against minilogue xd hardware readings
-// (raw → cents, positive half; mirrored for the negative side). Korg's
-// published MIDI table is a coarser straight-line approximation that reads
-// noticeably sharp in the upper octave (e.g. raw 861 → 774¢ vs the device's
-// 710¢); these breakpoints match what the panel actually displays.
+// VCO pitch raw → cents, positive half (mirrored for the negative side),
+// calibrated against the panel display. Korg's published MIDI table reads sharp
+// in the upper octave (e.g. raw 861 → 774¢ vs the device's 710¢); these match the device.
 const PITCH_CURVE: ReadonlyArray<readonly [number, number]> = [
   [512, 0],
   [536, 2],
