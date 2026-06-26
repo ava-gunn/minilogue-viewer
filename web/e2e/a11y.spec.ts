@@ -1,38 +1,39 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 
-// Automated WCAG A/AA audit (axe-core) over the two web-served views. Catches contrast,
-// ARIA, label and landmark regressions in a real browser (the vitest specs cover structure +
-// keyboard; axe adds layout-dependent checks like contrast). The Ableton embed reuses the
-// same components/CSS and is covered structurally by views.a11y.test.ts.
+// Automated WCAG A/AA audit (axe-core). The viewer is the single web view; the re-synth form
+// lives in it behind the (feature-flagged) Resynthesis button, so it's audited with the form
+// open. The Ableton embed reuses the same components/CSS and is covered structurally by
+// views.a11y.test.ts.
 
-const views = [
-  { name: 'viewer', path: '/' },
-  { name: 're-synth', path: '/resynth.html' },
-]
+const wcag = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']
+const summary = (
+  violations: { id: string; impact?: string | null; nodes: unknown[] }[],
+): string =>
+  JSON.stringify(
+    violations.map((v) => ({ id: v.id, impact: v.impact, n: v.nodes.length })),
+    null,
+    2,
+  )
 
-for (const { name, path } of views) {
-  test(`${name}: no WCAG A/AA axe violations`, async ({ page }) => {
-    await page.goto(path)
-    await page.locator('main#main').waitFor()
-    const { violations } = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-      .analyze()
-    // Surface the rule ids + counts in the failure message for quick triage.
-    expect(
-      violations,
-      JSON.stringify(
-        violations.map((v) => ({
-          id: v.id,
-          impact: v.impact,
-          n: v.nodes.length,
-        })),
-        null,
-        2,
-      ),
-    ).toEqual([])
-  })
-}
+test('viewer: no WCAG A/AA axe violations', async ({ page }) => {
+  await page.goto('/')
+  await page.locator('main#main').waitFor()
+  const { violations } = await new AxeBuilder({ page }).withTags(wcag).analyze()
+  expect(violations, summary(violations)).toEqual([])
+})
+
+test('re-synth form: no WCAG A/AA axe violations', async ({ page }) => {
+  await page.goto('/')
+  await page.locator('main#main').waitFor()
+  const open = page.locator('#resynth-open')
+  // Skipped when the feature flag is off (the button is disabled and the form never loads).
+  test.skip(await open.isDisabled(), 'Resynthesis disabled (VITE_RESYNTH_ENABLED off)')
+  await open.click()
+  await page.locator('#resynth-form:not([hidden])').waitFor()
+  const { violations } = await new AxeBuilder({ page }).withTags(wcag).analyze()
+  expect(violations, summary(violations)).toEqual([])
+})
 
 test('viewer: skip link is the first tab stop and targets main', async ({
   page,

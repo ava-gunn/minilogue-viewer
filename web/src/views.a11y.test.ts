@@ -13,7 +13,7 @@ const view = (name: string): Document => {
   return new DOMParser().parseFromString(html, 'text/html')
 }
 
-const ALL = ['index.html', 'resynth.html', 'embed.html']
+const ALL = ['index.html', 'embed.html']
 
 describe.each(ALL)('%s — page structure', (name) => {
   const doc = view(name)
@@ -49,19 +49,16 @@ describe.each([
   })
 })
 
-describe.each([
-  'index.html',
-  'resynth.html',
-])('%s — MIDI status is announced', (name) => {
+describe('index.html — MIDI status is announced', () => {
   it('marks #midi-status as a live status region', () => {
-    expect(view(name).querySelector('#midi-status')?.getAttribute('role')).toBe(
-      'status',
-    )
+    expect(
+      view('index.html').querySelector('#midi-status')?.getAttribute('role'),
+    ).toBe('status')
   })
 })
 
-describe('resynth.html — controls', () => {
-  const doc = view('resynth.html')
+describe('index.html — resynth form', () => {
+  const doc = view('index.html')
 
   it('the waveform canvas has an image role + label', () => {
     const c = doc.querySelector('#resynth-wave')

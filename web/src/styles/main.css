@@ -113,3 +113,35 @@
 .toast-close:hover {
   opacity: 1;
 }
+
+/* ---- Resynthesis button (below the synth) --------------------------------- */
+/* Always present; clicking it replaces the button with the form (lazy-loaded on first click).
+   Inline width (fits its label), left-aligned with the synth's left edge. */
+.resynth-open {
+  display: inline-block;
+  margin: var(--wa-space-m, 1rem) 0 0;
+  padding: 0.5rem 1.1rem;
+  font: inherit;
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+  color: var(--wa-color-neutral-on-normal, #e6e6ea);
+  background: var(--xd-group-bg, #18181c);
+  border: 1px solid var(--xd-divider, #44444e);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.resynth-open:hover:not(:disabled) {
+  border-color: var(--wa-color-neutral-50, #8a8a93);
+}
+.resynth-open:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* The lazy resynth form sits in the slot below (synth width, centered like the panel). */
+#resynth-form {
+  inline-size: var(--xd-min-w, 1250px);
+  max-inline-size: min(20in, 100%);
+  margin-inline: auto;
+}

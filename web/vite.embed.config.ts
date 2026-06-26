@@ -10,6 +10,8 @@ const root = dirname(fileURLToPath(import.meta.url))
 // data: URL inside Live's WebView. No ONNX/inference is imported, so the bundle stays small.
 export default defineConfig({
   root,
+  // Read .env from the repo root (same as the main build) so VITE_WEB_URL is picked up here too.
+  envDir: resolve(root, '..'),
   // The single file inlines everything, so don't copy public/ (ort wasm, models) — the
   // output is just embed.html.
   publicDir: false,

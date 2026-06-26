@@ -32,19 +32,16 @@ const serveOrtRuntime = (): Plugin => ({
 
 export default defineConfig({
   server: { port: 5173, strictPort: true },
-  // Two entry points: the file viewer (index.html) and the re-synthesis view
-  // (resynth.html). cleanUrls (vercel.json) serves the latter at /resynth.
+  // Load .env from the repo root (one .env for web + server + python). Only VITE_-prefixed vars
+  // reach the client; the server/python secrets in that file stay unexposed.
+  envDir: resolve(root, '..'),
+  // Single page (index.html). The re-synthesis form lives here too but its controller + deps
+  // (ONNX, @google/genai, Turnstile) load as a separate chunk on the first Resynthesis click.
   build: {
     // No inline modulepreload polyfill — keeps the prod HTML free of inline scripts so the
     // strict script-src CSP (vercel.json) holds. Safe: Web MIDI already limits this app to
     // modern Chromium, which supports modulepreload natively.
     modulePreload: { polyfill: false },
-    rollupOptions: {
-      input: {
-        main: resolve(root, 'index.html'),
-        resynth: resolve(root, 'resynth.html'),
-      },
-    },
   },
   // Keep ort out of dep pre-bundling so esbuild doesn't strip the @vite-ignore on its
   // runtime wasm-glue import.

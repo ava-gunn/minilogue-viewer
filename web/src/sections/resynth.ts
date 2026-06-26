@@ -3,6 +3,10 @@
 // thumbs-up/down feedback. Drives the panel through the same patch:load event the viewer
 // uses; the engines converge on a rawById map (see inference/decode + gemini/schema).
 
+// Loaded lazily on first Resynthesis click — its CSS rides along in this chunk so the viewer's
+// initial bundle stays free of the form styles.
+import '../styles/resynth.css'
+
 import { emit, on } from '../events/bus'
 import { AUDIO_ACCEPT } from '../events/files'
 import { matchAudioRawById } from '../inference'
@@ -21,8 +25,7 @@ import {
   submitContribution,
 } from '../services/contribute'
 import { analyzeAudio, analyzeText, MODELS } from '../services/gemini'
-import { createLivePatch } from '../services/live-patch'
-import { connectMidi, type MidiController } from '../services/midi'
+import type { SynthLink } from '../services/synth-link'
 import { toast } from '../services/toast'
 import {
   mountTurnstile,
@@ -31,7 +34,6 @@ import {
   turnstileToken,
 } from '../services/turnstile'
 import { isLocalhost, verifyOnHardware } from '../services/verify'
-import { initMidiStatus } from './midi-status'
 
 const STEPS = ['upload', 'patch', 'try', 'feedback'] as const
 type Step = (typeof STEPS)[number]
@@ -83,7 +85,7 @@ function formatResult(
   return blocks.join('\n\n')
 }
 
-export function initResynth(): void {
+export function initResynth(link: SynthLink): void {
   const stepEls = Array.from(
     document.querySelectorAll<HTMLLIElement>('#resynth-steps li'),
   )
@@ -137,16 +139,13 @@ export function initResynth(): void {
   }
   const engine = (): Engine => (geminiRadio?.checked ? 'gemini' : 'builtin')
 
-  // Load-to-hardware state: a template prog_bin captured from the connected synth's
-  // current program, overwritten with the generated params and sent back.
-  let midi: MidiController | undefined
+  // Load-to-hardware: the shared synth link supplies the live program (template) + sendProgram.
   let connected = false
-  let template: Uint8Array | undefined
-  // The button only shows when an xd is connected; enabled once we also have a
-  // captured template and a generated patch.
+  // The button only shows when an xd is connected; enabled once we also have a captured
+  // template (the synth's live program) and a generated patch.
   const updateLoad = (): void => {
     loadBtn?.toggleAttribute('hidden', !connected)
-    if (loadBtn) loadBtn.disabled = !(connected && template && rawById)
+    if (loadBtn) loadBtn.disabled = !(connected && link.getTemplate() && rawById)
   }
 
   // ---- engine selector + credentials ---------------------------------------
@@ -445,14 +444,15 @@ export function initResynth(): void {
     if (!file) return
     let submitRaw = rawById
     if (kind === 'adjusted') {
-      if (!template) {
+      const t = link.getTemplate()
+      if (!t) {
         toast(
           'Connect your minilogue xd and load the patch first so we can capture your changes.',
           'danger',
         )
         return
       }
-      submitRaw = readRawById(template) // current edit buffer = generated + the user's tweaks
+      submitRaw = readRawById(t) // current edit buffer = generated + the user's tweaks
     }
     if (!submitRaw) return
 
@@ -534,8 +534,9 @@ export function initResynth(): void {
   mineBtn?.addEventListener('click', () => void submit('adjusted'))
 
   // ---- load to hardware ----------------------------------------------------
-  // Shared MIDI status indicator (dot/text + refresh) — registered before connecting.
-  initMidiStatus()
+  // MIDI status + live mirroring are owned by the always-loaded viewer (the shared synth link);
+  // here we only track connection state for the Load / "Mine's better" buttons and send the
+  // generated patch via the link.
   on('midi:status', ({ state }) => {
     connected = state === 'connected'
     updateLoad()
@@ -543,37 +544,15 @@ export function initResynth(): void {
     mineBtn?.toggleAttribute('hidden', !connected)
   })
   loadBtn?.addEventListener('click', () => {
-    if (!template || !rawById) return
-    const ok = midi?.sendProgram(writeProgBin(template, rawById)) ?? false
+    const t = link.getTemplate()
+    if (!t || !rawById) return
+    const ok = link.sendProgram(writeProgBin(t, rawById))
     setStatus(
       ok
         ? 'Loaded to your minilogue xd — play a note to hear it.'
         : 'No minilogue xd output found.',
     )
   })
-  byId<HTMLButtonElement>('midi-refresh')?.addEventListener('click', () =>
-    midi?.refresh(),
-  )
-  // Mirror the connected synth's live knob moves onto the panel (so you can dial the proposed
-  // patch into the hardware). The program needles show the GENERATED patch, so a dump only
-  // sets the CC-decode baseline (setBaseline, no patch:load); each synth needle then appears
-  // when its knob is physically moved (a CC).
-  const live = createLivePatch()
-  void (async () => {
-    midi =
-      (await connectMidi({
-        onDump: (prog) => {
-          template = prog // captured for the Load-patch button
-          live.setBaseline(prog)
-          updateLoad()
-        },
-        onPoll: (prog) => {
-          template = prog
-          updateLoad()
-        },
-        onControlChange: (cc, value) => live.controlChange(cc, value),
-      })) ?? undefined
-  })()
 
   // initial state
   syncEngine()

@@ -63,19 +63,6 @@
   border-color: var(--wa-color-text-quiet, #8a8a93);
 }
 
-/* Link to the audio -> patch re-synthesis view. */
-.resynth-link {
-  padding: 0.3em 0.95em;
-  font-size: 0.85rem;
-  color: var(--wa-color-text-normal, #e0e0e6);
-  text-decoration: none;
-  border: 1px solid var(--xd-divider, #44444e);
-  border-radius: var(--wa-border-radius-m, 6px);
-}
-.resynth-link:hover {
-  border-color: var(--wa-color-text-quiet, #8a8a93);
-}
-
 /* Legend + colour pickers for the two indicators, in the panel footer (xd-bottom).
    margin-inline-start: auto pushes it to the right edge. Clicking a swatch opens the
    OS colour picker; the choice updates --xd-knob-teal / --xd-knob-live live. */

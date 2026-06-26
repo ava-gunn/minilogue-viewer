@@ -13,6 +13,9 @@ interface HostBridge {
 // origin of its own. The embed links here (resynthesis etc. live in the full web version).
 const WEB_URL =
   import.meta.env.VITE_WEB_URL || 'https://minilogue-xd-viewer.vercel.app/'
+// The embed is viewer-only; its "open in browser" link lands on the full app's Resynthesis form
+// (single page now — ?resynth opens the form when the feature is enabled there).
+const RESYNTH_URL = `${WEB_URL}?resynth=1`
 
 function host(): HostBridge | undefined {
   const w = window as unknown as {
@@ -51,10 +54,10 @@ export function closeWindow(): void {
 export function initEmbed(): void {
   const link = document.querySelector<HTMLAnchorElement>('.embed-web-link')
   if (link) {
-    link.href = WEB_URL // reflect the configured URL (overridable at build time)
+    link.href = RESYNTH_URL // reflect the configured URL (overridable at build time)
     link.addEventListener('click', (e) => {
       e.preventDefault()
-      openExternal(WEB_URL)
+      openExternal(RESYNTH_URL)
     })
   }
 

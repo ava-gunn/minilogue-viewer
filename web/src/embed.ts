@@ -8,7 +8,6 @@ import '@awesome.me/webawesome/dist/components/badge/badge.js'
 
 import './components'
 
-import { emit, on } from './events/bus'
 import { mountPanel } from './panel'
 import { initEffects } from './sections/effects'
 import { initLibrary, initLoad } from './sections/load'
@@ -30,11 +29,3 @@ const oledHint = document
   .getElementById('oled')
   ?.shadowRoot?.querySelector('.hint')
 if (oledHint) oledHint.textContent = 'drop a patch file here'
-
-// Audio matching / re-synthesis is browser-only; guide the user there if they pick audio.
-on('audio:dropped', () =>
-  emit('file:error', {
-    message:
-      'Audio re-synthesis is available in the browser — use Resynthesis.',
-  }),
-)

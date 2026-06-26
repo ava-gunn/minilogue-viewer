@@ -20,7 +20,7 @@ test('dropping a .mnlgxdprog animates the panel to the patch', async ({
   await page.goto('/')
 
   const before = await knobAngle(page, 'cutoff')
-  await page.locator('input[type="file"]').first().setInputFiles(PROG)
+  await page.locator('#oled').locator('input[type="file"]').setInputFiles(PROG)
 
   // Cutoff knob rotates away from its default once the patch loads.
   await expect.poll(() => knobAngle(page, 'cutoff')).not.toBe(before)
@@ -35,7 +35,7 @@ test('dropping a .mnlgxdlib opens the library and switches programs', async ({
   page,
 }) => {
   await page.goto('/')
-  await page.locator('input[type="file"]').first().setInputFiles(LIB)
+  await page.locator('#oled').locator('input[type="file"]').setInputFiles(LIB)
 
   const panel = page.locator('#library-panel')
   await expect(panel).not.toHaveAttribute('hidden', /.*/)

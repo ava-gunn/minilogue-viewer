@@ -4,6 +4,9 @@
   "buildCommand": "pnpm build",
   "outputDirectory": "dist",
   "cleanUrls": true,
+  "redirects": [
+    { "source": "/resynth", "destination": "/?resynth=1", "permanent": false }
+  ],
   "headers": [
     {
       "source": "/(.*)",
