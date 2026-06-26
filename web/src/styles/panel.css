@@ -189,6 +189,12 @@ xd-knob[data-param-key="modeDepth"]::part(label) {
 #library-panel {
   margin-top: var(--wa-space-m, 1rem);
 }
+/* Same chassis shadow as the synth panel (.xd). */
+#library-panel::part(base) {
+  box-shadow:
+    inset 0 1px 0 #ffffff10,
+    0 8px 32px #0008;
+}
 #library-panel[hidden] {
   display: none;
 }
