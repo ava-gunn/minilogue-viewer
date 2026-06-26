@@ -1,10 +1,9 @@
 """Reusable hardware interface to the Minilogue XD over a MIDI + audio interface (the
 Volt 276): load a patch via SysEx, play a gated note, record the output.
 
-Shared by the recording rig (4b) and the active-learning loop (Phase 7). The note is
-gated off before the recording ends so the full envelope — including release — is
-captured (the lesson from Surge pretraining), and the returned audio is trimmed to start
-exactly at note-on so onsets align with the Surge renders.
+Shared by the recording rig and the eval loop. The note is gated off before the
+recording ends so the full envelope — including release — is captured, and the
+returned audio is trimmed to start exactly at note-on so onsets align across samples.
 """
 
 from __future__ import annotations

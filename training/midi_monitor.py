@@ -9,7 +9,7 @@ to other listeners). To capture what a DAW like Ableton sends to the synth, run 
 --virtual and re-route the DAW track's MIDI output to the "XD Monitor" port that appears;
 everything it sends then shows up here.
 
-Run from the repo root with the training venv (same convention as the daemon):
+Run from the repo root with the training venv (same convention as the other entrypoints):
 
     PYTHONPATH=. training/.venv/bin/python -m training.midi_monitor            # watch every input
     PYTHONPATH=. training/.venv/bin/python -m training.midi_monitor --list     # list ports and exit

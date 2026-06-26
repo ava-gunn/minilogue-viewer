@@ -1,11 +1,9 @@
-"""Compact CNN for sound matching, split so the feature extractor transfers across synths:
+"""Compact CNN for sound matching, split so the feature extractor stays reusable:
 
-  Backbone           log-mel [B,1,N_MELS,N_FRAMES] -> 128-d embedding (the part that
-                     transfers from Surge pretraining to the XD fine-tune)
+  Backbone           log-mel [B,1,N_MELS,N_FRAMES] -> 128-d embedding (reusable
+                     feature extractor)
   SoundMatchEncoder  Backbone + XD multi-head (continuous [0,1] sigmoid, discrete logits,
                      boolean [0,1] sigmoid) — the model exported to ONNX
-  SurgePretrainModel Backbone + a Surge-native regression head, used only to pretrain the
-                     backbone; save model.backbone for transfer.
 
 Requires torch (the `train` extra). Stick to ONNX-opset-17-clean ops.
 """
@@ -65,16 +63,3 @@ class SoundMatchEncoder(nn.Module):
             self.discrete(h),
             torch.sigmoid(self.boolean(h)),
         )
-
-
-class SurgePretrainModel(nn.Module):
-    """Backbone + a Surge-native regression head ([0,1] params). Pretrain this, then save
-    `model.backbone.state_dict()` to transfer the feature extractor to the XD fine-tune."""
-
-    def __init__(self, n_params: int) -> None:
-        super().__init__()
-        self.backbone = Backbone()
-        self.head = nn.Linear(Backbone.EMBED_DIM, n_params)
-
-    def forward(self, mel: torch.Tensor) -> torch.Tensor:
-        return torch.sigmoid(self.head(self.backbone(mel)))

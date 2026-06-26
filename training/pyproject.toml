@@ -15,8 +15,6 @@ dependencies = [
 train = ["torch", "librosa"]
 # XD SysEx recording rig (Phase 4b).
 record = ["mido", "python-rtmidi", "sounddevice", "soundfile"]
-# Surge XT pretraining data (Phase 4a).
-surge = ["pedalboard"]
 # Real-world resynthesis eval (eval/): model inference + audio similarity metrics.
 # Add the `record` extra too for the automated hardware loop (--hardware).
 eval = ["librosa", "soundfile"]
