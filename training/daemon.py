@@ -225,7 +225,9 @@ def _pull_remote(state: State) -> None:
         cid = rec.get("id")
         if not cid or cid in state.remote_ledger:
             continue
-        if rec.get("rating") != "up":  # only verify liked patches
+        # Positively-rated only. 'as-is' = generated patch confirmed; 'adjusted' = the user's
+        # hardware-tweaked version (a higher-quality label). 'up' kept for older contributions.
+        if rec.get("rating") not in ("up", "as-is", "adjusted"):
             state.remote_ledger.add(cid)
             continue
         try:

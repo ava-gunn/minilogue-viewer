@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readRawPatch } from './binary'
-import { writeProgBin } from './write'
+import { readRawById, writeProgBin } from './write'
 
 const template = (): Uint8Array => {
   const buf = new Uint8Array(1024)
@@ -31,5 +31,23 @@ describe('writeProgBin', () => {
     expect(raw.cutoff).toBe(1023) // clamped to 10-bit max
     expect(raw.vco1Wave).toBe(2) // clamped to cardinality - 1
     expect(raw.resonance).toBe(0) // not supplied
+  })
+})
+
+describe('readRawById', () => {
+  it('round-trips writeProgBin by spec id (incl. voice_mode) — the "Mine\'s better" read', () => {
+    const written = {
+      voice_mode: 3, // UNISON
+      cutoff: 700,
+      vco1_wave: 2,
+      amp_sustain: 0,
+      portamento: 42, // 8-bit
+    }
+    const back = readRawById(writeProgBin(template(), written))
+    expect(back.voice_mode).toBe(3)
+    expect(back.cutoff).toBe(700)
+    expect(back.vco1_wave).toBe(2)
+    expect(back.amp_sustain).toBe(0)
+    expect(back.portamento).toBe(42)
   })
 })
