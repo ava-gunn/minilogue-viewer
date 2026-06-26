@@ -39,13 +39,20 @@ def _precompute_mels(data_dir: Path, rows: list[dict]) -> np.ndarray:
     return mels
 
 
-def load_sweep(data_dir: Path) -> tuple[np.ndarray, torch.Tensor, torch.Tensor]:
-    """Returns (mels [N, N_MELS, N_FRAMES] memmap, embeddings [N, E] unit-norm,
-    param vectors [N, VEC_DIM]), all row-aligned to clip id."""
-    rows = [json.loads(line) for line in (data_dir / "samples.jsonl").read_text().splitlines()]
-    emb = np.array(np.load(data_dir / "embeddings.npy", mmap_mode="r"), dtype=np.float32)  # copy: writable for torch
-    if len(emb) != len(rows):
-        raise SystemExit(f"samples/embeddings mismatch: {len(rows)} rows vs {len(emb)} embeddings")
-    mels = _precompute_mels(data_dir, rows)
-    params = np.stack([paramvec.targets_to_vector(r) for r in rows])
-    return mels, F.normalize(torch.from_numpy(emb), dim=-1), torch.from_numpy(params)
+def load_sweeps(dirs: list[Path]) -> tuple[np.ndarray, torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Load + concatenate one or more sweep/preset dirs. Returns (mels [N, N_MELS, N_FRAMES],
+    embeddings [N, E] unit-norm, param vectors [N, VEC_DIM], is_eval [N] bool). Rows tagged
+    split=="eval" (held-out presets) set is_eval; sweep rows without a split count as train.
+    Mels are read fully into RAM (memory scales with total clips)."""
+    mels_p, emb_p, par_p, ev = [], [], [], []
+    for d in dirs:
+        rows = [json.loads(line) for line in (d / "samples.jsonl").read_text().splitlines()]
+        emb = np.array(np.load(d / "embeddings.npy", mmap_mode="r"), dtype=np.float32)  # copy: writable for torch
+        if len(emb) != len(rows):
+            raise SystemExit(f"{d}: {len(rows)} rows vs {len(emb)} embeddings")
+        mels_p.append(np.asarray(_precompute_mels(d, rows)))
+        emb_p.append(emb)
+        par_p.append(np.stack([paramvec.targets_to_vector(r) for r in rows]))
+        ev.extend(r.get("split") == "eval" for r in rows)
+    emb = F.normalize(torch.from_numpy(np.concatenate(emb_p)), dim=-1)
+    return np.concatenate(mels_p), emb, torch.from_numpy(np.concatenate(par_p)), torch.tensor(ev)
