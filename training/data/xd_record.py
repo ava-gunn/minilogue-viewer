@@ -1,9 +1,10 @@
-"""XD recording rig: load randomized patches into the Minilogue XD, play a gated C4,
-record the output, and write (audio, param-target) pairs — the fine-tune dataset.
+"""XD Sobol sweep (Stage 1): load Sobol-sampled patches into the Minilogue XD, play a
+gated 1 s note, record 2 s (captures the decay/release tail), and write (audio, params)
+pairs — the synthetic dataset the proxy and encoder train on.
 
-    python -m training.data.xd_record --n 2000 --out /Volumes/Samples/training/xd
+    python -m training.data.xd_record --n 10000 --out /Volumes/Samples/training/xd
 
-Unattended + resumable (samples.jsonl appended/flushed per sample); runs under a keep-awake
+Unattended + resumable (samples.jsonl appended/flushed per patch); runs under a keep-awake
 assertion; preflights disk + a calibration render before the long run. Run from repo root.
 """
 
@@ -11,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import signal
 import sys
 import wave
@@ -40,7 +42,9 @@ def _count_done(out: Path) -> int:
     return sum(1 for _ in jsonl.open()) if jsonl.exists() else 0
 
 
-def _write_meta(out: Path, gate: float, duration: float, pitches: list[int]) -> None:
+def _write_meta(
+    out: Path, gate: float, duration: float, pitches: list[int], seed: int, audible: bool
+) -> None:
     out.joinpath("meta.json").write_text(
         json.dumps(
             {
@@ -51,6 +55,9 @@ def _write_meta(out: Path, gate: float, duration: float, pitches: list[int]) -> 
                 "gate_s": gate,
                 "duration_s": duration,
                 "pitches": pitches,
+                "sampling": "sobol",
+                "seed": seed,
+                "audible": audible,
             }
         )
     )
@@ -58,21 +65,28 @@ def _write_meta(out: Path, gate: float, duration: float, pitches: list[int]) -> 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--n", type=int, default=2000, help="total target sample count")
+    ap.add_argument("--n", type=int, default=10000, help="total target clip count (= patches × pitches)")
     ap.add_argument("--out", type=Path, default=Path("/Volumes/Samples/training/xd"))
     ap.add_argument(
         "--template", type=Path, default=_REPO / "web" / "replicant-example.mnlgxdprog"
     )
-    ap.add_argument("--gate", type=float, default=0.6)
-    ap.add_argument("--duration", type=float, default=1.0)
+    ap.add_argument("--gate", type=float, default=1.0, help="note-on seconds (1 s triggered note)")
+    ap.add_argument("--duration", type=float, default=2.0, help="capture seconds (2 s: incl. tail)")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument(
+        "--audible",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="confine osc levels/cutoff/attack to audible sub-ranges (--no-audible = full space)",
+    )
     # USB MIDI to the Korg's sound engine (no DIN baud bottleneck); audio via the Volt.
     ap.add_argument("--midi-out", default="minilogue xd SOUND")
     ap.add_argument("--midi-in", default="minilogue xd KBD/KNOB")
     ap.add_argument("--audio", default="Volt 276")
     ap.add_argument("--settle", type=float, default=0.1, help="post-dump settle (0.1 for USB)")
-    # Record each patch at several pitches -> pitch-invariant model + more data.
-    ap.add_argument("--pitches", default="36,60,84", help="MIDI notes per patch (e.g. C2,C4,C6)")
+    # One pitch per patch keeps params -> audio a clean function for the proxy; pass more
+    # (e.g. 36,60,84) for a pitch-robust set — each pitch is recorded as its own clip.
+    ap.add_argument("--pitches", default="60", help="MIDI notes per patch (e.g. C4, or 36,60,84)")
     args = ap.parse_args()
 
     # A kill (SIGTERM) should still run the finally below (close -> panic) so a note
@@ -83,7 +97,7 @@ def main() -> None:
     out = args.out
     (out / "audio").mkdir(parents=True, exist_ok=True)
     preflight_disk(out, need_gb=1.0)
-    _write_meta(out, args.gate, args.duration, pitches)
+    _write_meta(out, args.gate, args.duration, pitches, args.seed, args.audible)
     template = korg.extract_prog_bins(args.template)[0]
 
     sr = schema.AUDIO["sample_rate"]
@@ -101,6 +115,11 @@ def main() -> None:
                 "calibration silent — check Korg power/volume + Volt input gain/connection"
             )
 
+        # The full Sobol sequence is deterministic in (seed, n_patches), so resuming is just
+        # indexing into it — regenerate, then skip the patches already on disk.
+        n_patches = math.ceil(args.n / len(pitches))
+        sweep = xd_params.sobol_unit(n_patches, args.seed)
+
         # Resume by render count, aligned to whole patches (drop a partial patch's
         # renders from a prior crash so labels/ids stay consistent).
         start = _count_done(out)
@@ -113,20 +132,20 @@ def main() -> None:
             print(f"already have {start} >= {args.n} renders at {out}")
             return
         patches_done = start // len(pitches)
-        print(f"resuming at {start} renders ({patches_done} patches), target {args.n}; pitches {pitches}")
-        rng = np.random.default_rng(args.seed + patches_done)
+        print(f"resuming at {start} renders ({patches_done}/{n_patches} patches), target {args.n}; "
+              f"pitches {pitches}, audible={args.audible}")
 
         kept = start
         with keep_awake(), (out / "samples.jsonl").open("a") as manifest:
-            while kept < args.n:
-                prog_bin, targets = xd_params.randomize(template, rng)
+            for patch in range(patches_done, n_patches):
+                prog_bin, targets = xd_params.sample(template, sweep[patch], audible=args.audible)
                 xd.send_patch(prog_bin, settle_s=args.settle)
                 lines = []
                 for pitch in pitches:  # same patch + labels, different note
                     audio = xd.record(note=pitch, gate_s=args.gate, duration_s=args.duration)
                     rms = float(np.sqrt(np.mean(audio**2)))
                     _write_wav(out / "audio" / f"{kept:06d}.wav", audio, sr)
-                    lines.append(json.dumps({"id": kept, "pitch": pitch, "rms": rms, **targets}))
+                    lines.append(json.dumps({"id": kept, "patch": patch, "pitch": pitch, "rms": rms, **targets}))
                     kept += 1
                 manifest.write("\n".join(lines) + "\n")  # whole patch flushed together
                 manifest.flush()
