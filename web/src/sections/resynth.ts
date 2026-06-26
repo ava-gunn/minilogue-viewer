@@ -7,7 +7,7 @@ import { emit, on } from '../events/bus'
 import { AUDIO_ACCEPT } from '../events/files'
 import { matchAudioRawById } from '../inference'
 import { rawByIdToPatch } from '../inference/decode'
-import { writeProgBin } from '../parser/write'
+import { readRawById, writeProgBin } from '../parser/write'
 import {
   getApiKey,
   getModel,
@@ -20,7 +20,7 @@ import {
   type Rating,
   submitContribution,
 } from '../services/contribute'
-import { analyzeAudio, MODELS } from '../services/gemini'
+import { analyzeAudio, analyzeText, MODELS } from '../services/gemini'
 import { createLivePatch } from '../services/live-patch'
 import { connectMidi, type MidiController } from '../services/midi'
 import { toast } from '../services/toast'
@@ -66,6 +66,7 @@ const ANALYSIS_LABELS: Record<string, string> = {
   movement: 'Movement',
   effects: 'Effects',
   envelope: 'Envelope',
+  voice: 'Voice',
 }
 function formatResult(
   rationale: string | undefined,
@@ -98,6 +99,8 @@ export function initResynth(): void {
   const fileBtn = byId<HTMLButtonElement>('resynth-file-btn')
   const fileInput = byId<HTMLInputElement>('resynth-file')
   const filename = byId('resynth-filename')
+  const clearBtn = byId<HTMLButtonElement>('resynth-clear')
+  const textInput = byId<HTMLTextAreaElement>('resynth-text')
 
   const preview = byId('resynth-preview')
   const canvas = byId<HTMLCanvasElement>('resynth-wave')
@@ -112,10 +115,11 @@ export function initResynth(): void {
   const status = byId('resynth-status')
 
   const feedback = byId('resynth-feedback')
+  const feedbackRow = byId('resynth-feedback-row')
   const result = byId('resynth-result')
   const pitchSel = byId<HTMLSelectElement>('resynth-pitch')
-  const upBtn = byId<HTMLButtonElement>('resynth-up')
-  const downBtn = byId<HTMLButtonElement>('resynth-down')
+  const asIsBtn = byId<HTMLButtonElement>('resynth-asis')
+  const mineBtn = byId<HTMLButtonElement>('resynth-mine')
   const turnstileBox = byId('resynth-turnstile')
 
   const setStatus = (msg: string): void => {
@@ -172,6 +176,16 @@ export function initResynth(): void {
   // ship the screenshot to Gemini when it's meaningful — plus the clip duration for envelope scaling.
   let waveformOk = false
   let waveformDuration = 0
+  // Whether drawWaveform has finished for the current file (success or fail) — gates Generate so
+  // the waveform screenshot is ready before we send.
+  let waveformReady = false
+
+  // Generate is enabled when there's a ready audio waveform OR a non-empty text description.
+  const updateGenerate = (): void => {
+    const hasText = !!textInput?.value.trim()
+    if (generateBtn) generateBtn.disabled = !((file && waveformReady) || hasText)
+  }
+
   async function drawWaveform(f: File): Promise<void> {
     waveformOk = false
     waveformDuration = 0
@@ -236,7 +250,8 @@ export function initResynth(): void {
     void drawWaveform(f).finally(() => {
       // Waveform ready (or decode failed) → safe to generate. Enable even on failure so the
       // audio can still be sent; the screenshot is simply omitted when there's nothing to grab.
-      if (generateBtn) generateBtn.disabled = false
+      waveformReady = true
+      updateGenerate()
     })
   }
 
@@ -267,7 +282,35 @@ export function initResynth(): void {
     }
   })
 
-  // ---- file selection ------------------------------------------------------
+  // ---- audio / text input (mutually exclusive) -----------------------------
+  // Whichever input has content disables the other.
+  const syncInputs = (): void => {
+    const hasText = !!textInput?.value.trim()
+    if (textInput) textInput.disabled = !!file
+    if (fileBtn) fileBtn.disabled = hasText
+    drop?.classList.toggle('disabled', hasText)
+    updateGenerate()
+  }
+
+  const clearAudio = (): void => {
+    file = undefined
+    rawById = undefined
+    waveformReady = false
+    if (objectUrl) {
+      URL.revokeObjectURL(objectUrl)
+      objectUrl = undefined
+    }
+    audio?.removeAttribute('src')
+    if (filename) filename.textContent = ''
+    // Swap back: hide the waveform, restore the drop.
+    preview?.setAttribute('hidden', '')
+    drop?.removeAttribute('hidden')
+    feedback?.setAttribute('hidden', '')
+    setStep('upload')
+    setStatus('')
+    syncInputs()
+  }
+
   const acceptAudio = (f: File): void => {
     if (!isAudio(f.name)) {
       setStatus(`Unsupported file: ${f.name}`)
@@ -275,11 +318,14 @@ export function initResynth(): void {
     }
     file = f
     rawById = undefined
+    waveformReady = false
     if (filename) filename.textContent = f.name
-    // Keep Generate disabled until the waveform has rendered (loadPreview re-enables it) so the
-    // request always includes the waveform screenshot + duration, not just the audio.
-    if (generateBtn) generateBtn.disabled = true
     feedback?.setAttribute('hidden', '')
+    // The waveform replaces the drop in-place; hide the drop, loadPreview shows the preview.
+    drop?.setAttribute('hidden', '')
+    // syncInputs disables the text box; Generate stays off until the waveform renders (then
+    // loadPreview's drawWaveform().finally re-enables it), so the screenshot is always included.
+    syncInputs()
     loadPreview(f)
     setStatus('')
     setStep('patch')
@@ -302,26 +348,46 @@ export function initResynth(): void {
     const f = e.dataTransfer?.files?.[0]
     if (f) acceptAudio(f)
   })
+  textInput?.addEventListener('input', syncInputs)
+  clearBtn?.addEventListener('click', clearAudio)
 
   // ---- generate patch ------------------------------------------------------
   generateBtn?.addEventListener('click', async () => {
-    if (!file) return
+    const text = textInput?.value.trim() ?? ''
+    const f = file
+    if (!f && !text) return
     const eng = engine()
-    if (eng === 'gemini' && !hasApiKey()) {
+    const useText = !f
+    // Text generation is Gemini-only; audio uses the selected engine. Either way Gemini needs a key.
+    if (!hasApiKey() && (useText || eng === 'gemini')) {
       setStatus('Enter your Gemini API token first.')
       keyInput?.focus()
       return
     }
-    const f = file
     if (generateBtn) generateBtn.disabled = true
     spinner?.removeAttribute('hidden')
-    setStatus(eng === 'gemini' ? `Asking ${getModel()}…` : 'Matching…')
+    setStatus(
+      useText
+        ? 'Designing…'
+        : eng === 'gemini'
+          ? `Asking ${getModel()}…`
+          : 'Matching…',
+    )
     if (result) result.textContent = ''
     try {
       let name: string | undefined
       let rationale: string | undefined
       let analysis: Record<string, string> | undefined
-      if (eng === 'gemini') {
+      if (useText) {
+        const program = await analyzeText(text, {
+          apiKey: getApiKey(),
+          model: getModel(),
+          onProgress: setStatus,
+        })
+        rawById = program.rawById
+        name = program.name
+        rationale = program.rationale
+      } else if (f && eng === 'gemini') {
         const program = await analyzeAudio(f, {
           apiKey: getApiKey(),
           model: getModel(),
@@ -333,9 +399,11 @@ export function initResynth(): void {
         name = program.name
         rationale = program.rationale
         analysis = program.analysis
-      } else {
+      } else if (f) {
         rawById = await matchAudioRawById(f)
         name = 'AI MATCH'
+      } else {
+        return
       }
       patchName = name
       lastRationale = rationale
@@ -348,12 +416,15 @@ export function initResynth(): void {
       if (result) {
         result.textContent =
           formatResult(rationale, analysis) ||
-          'Patch loaded — try it on your minilogue xd, then rate it.'
+          'Patch loaded — try it on your minilogue xd.'
       }
+      // A pure text patch has no audio to contribute — show the result but hide the thumbs row
+      // (and skip the captcha). Audio patches keep the full feedback/contribution flow.
       feedback?.removeAttribute('hidden')
-      // Remote submits need a captcha solve; mount the widget once feedback is shown
-      // (skipped on localhost, which uses the hardware daemon instead).
-      if (!isLocalhost() && turnstileBox) void mountTurnstile(turnstileBox)
+      feedbackRow?.toggleAttribute('hidden', useText)
+      if (!useText && !isLocalhost() && turnstileBox) {
+        void mountTurnstile(turnstileBox)
+      }
       setStep('try')
       setStatus('Done.')
       updateLoad()
@@ -363,40 +434,55 @@ export function initResynth(): void {
       toast(message, 'danger')
     } finally {
       spinner?.setAttribute('hidden', '')
-      if (generateBtn) generateBtn.disabled = false
+      updateGenerate()
     }
   })
 
-  // ---- feedback (thumbs submit the contribution) ---------------------------
-  const submit = async (rating: Rating): Promise<void> => {
-    if (!file || !rawById) return
-    if (upBtn) upBtn.disabled = true
-    if (downBtn) downBtn.disabled = true
-
-    // On localhost a thumbs-up runs the on-hardware verify+tune loop via the local daemon,
-    // for either engine — the daemon loads the params on the connected XD, records, scores
-    // the match, and folds verified patches into the built-in model's training set.
-    if (isLocalhost()) {
-      if (rating !== 'up') {
-        setStep('feedback')
-        stepEls
-          .find((li) => li.dataset.step === 'feedback')
-          ?.classList.add('done')
-        setStatus('Thumbs-down noted — not sent to the XD.')
+  // ---- feedback: contribute the patch -------------------------------------
+  // 'as-is' uploads the generated patch; 'adjusted' uploads the user's live hardware program
+  // (the generated patch + their knob tweaks), read back from the connected XD.
+  const submit = async (kind: Rating): Promise<void> => {
+    if (!file) return
+    let submitRaw = rawById
+    if (kind === 'adjusted') {
+      if (!template) {
+        toast(
+          'Connect your minilogue xd and load the patch first so we can capture your changes.',
+          'danger',
+        )
         return
       }
-      setStatus('Verifying on your minilogue xd…')
+      submitRaw = readRawById(template) // current edit buffer = generated + the user's tweaks
+    }
+    if (!submitRaw) return
+
+    if (asIsBtn) asIsBtn.disabled = true
+    if (mineBtn) mineBtn.disabled = true
+    const markDone = (): void => {
+      setStep('feedback')
+      stepEls.find((li) => li.dataset.step === 'feedback')?.classList.add('done')
+    }
+    const reenable = (): void => {
+      if (asIsBtn) asIsBtn.disabled = false
+      if (mineBtn) mineBtn.disabled = false
+    }
+
+    // On localhost the local daemon loads the params on the connected XD, records, scores the
+    // match, and folds verified patches into the built-in model's training set.
+    if (isLocalhost()) {
+      setStatus(
+        kind === 'adjusted'
+          ? 'Verifying your version on the XD…'
+          : 'Verifying on your minilogue xd…',
+      )
       try {
         const r = await verifyOnHardware({
           file,
-          rawById,
+          rawById: submitRaw,
           pitchMidi: Number(pitchSel?.value ?? 60),
           engine: engine(),
         })
-        setStep('feedback')
-        stepEls
-          .find((li) => li.dataset.step === 'feedback')
-          ?.classList.add('done')
+        markDone()
         setStatus(
           r.promoted
             ? `Verified ✓ mel_l1 ${r.mel_l1} (weight ${r.weight}) — added to training (${r.verified_total} verified).`
@@ -409,8 +495,7 @@ export function initResynth(): void {
           `Local verify failed: ${message}. Is the daemon running? (pnpm daemon:start)`,
           'danger',
         )
-        if (upBtn) upBtn.disabled = false
-        if (downBtn) downBtn.disabled = false
+        reenable()
       }
       return
     }
@@ -418,40 +503,35 @@ export function initResynth(): void {
     const tsToken = turnstileToken()
     if (turnstileEnabled() && !tsToken) {
       setStatus('Please complete the verification challenge first.')
-      if (upBtn) upBtn.disabled = false
-      if (downBtn) downBtn.disabled = false
+      reenable()
       return
     }
     setStatus('Sending feedback…')
     try {
       const id = await submitContribution({
         file,
-        rawById,
+        rawById: submitRaw,
         name: patchName,
         pitchMidi: Number(pitchSel?.value ?? 60),
         model: getModel(),
         engine: engine(),
-        rating,
+        rating: kind,
         analysis: lastAnalysis,
         rationale: lastRationale,
         turnstileToken: tsToken,
       })
       resetTurnstile()
-      setStep('feedback')
-      stepEls
-        .find((li) => li.dataset.step === 'feedback')
-        ?.classList.add('done')
-      setStatus(`Thanks! Feedback sent (${id}).`)
+      markDone()
+      setStatus(`Thanks! ${kind === 'adjusted' ? 'Your version' : 'Feedback'} sent (${id}).`)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       setStatus('')
       toast(`Could not send feedback: ${message}`, 'danger')
-      if (upBtn) upBtn.disabled = false
-      if (downBtn) downBtn.disabled = false
+      reenable()
     }
   }
-  upBtn?.addEventListener('click', () => void submit('up'))
-  downBtn?.addEventListener('click', () => void submit('down'))
+  asIsBtn?.addEventListener('click', () => void submit('as-is'))
+  mineBtn?.addEventListener('click', () => void submit('adjusted'))
 
   // ---- load to hardware ----------------------------------------------------
   // Shared MIDI status indicator (dot/text + refresh) — registered before connecting.
@@ -459,6 +539,8 @@ export function initResynth(): void {
   on('midi:status', ({ state }) => {
     connected = state === 'connected'
     updateLoad()
+    // "Mine's better" reads the live program off the XD, so it only makes sense when connected.
+    mineBtn?.toggleAttribute('hidden', !connected)
   })
   loadBtn?.addEventListener('click', () => {
     if (!template || !rawById) return

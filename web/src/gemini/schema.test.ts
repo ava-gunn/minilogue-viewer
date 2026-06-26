@@ -33,13 +33,14 @@ describe('buildProgramSchema', () => {
 })
 
 describe('buildAnalysisSchema', () => {
-  it('has the string analysis fields plus a numeric envelope object, all required', () => {
+  it('has the string analysis fields plus polyphonic + a numeric envelope object, all required', () => {
     const schema = buildAnalysisSchema()
-    const keys = [...Object.keys(ANALYSIS_FIELDS), 'envelope']
+    const keys = [...Object.keys(ANALYSIS_FIELDS), 'polyphonic', 'envelope']
     expect(schema.type).toBe('OBJECT')
     expect(Object.keys(schema.properties ?? {})).toEqual(keys)
     expect(schema.required).toEqual(keys)
     expect(schema.properties?.sound_type?.type).toBe('STRING')
+    expect(schema.properties?.polyphonic?.type).toBe('BOOLEAN')
 
     const env = schema.properties?.envelope
     expect(env?.type).toBe('OBJECT')

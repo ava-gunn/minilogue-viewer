@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>minilogue xd viewer</title>
 
+    <!-- Critical: paint the dark chassis background before CSS/JS load so navigating between
+         pages doesn't flash white (the panel itself is injected by JS). -->
+    <style>
+      html {
+        background: #0d0d10;
+        color-scheme: dark;
+      }
+    </style>
+
     <!-- Vercel Web Analytics (script served by Vercel at runtime once enabled). -->
     <script>
       window.va =

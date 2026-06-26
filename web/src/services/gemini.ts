@@ -156,6 +156,7 @@ async function describeAudio(
 ): Promise<{
   analysis: Record<string, string>
   envelope: Record<string, number> | undefined
+  polyphonic: boolean | undefined
 }> {
   const data = await toBase64(file)
   const parts: ContentPart[] = [
@@ -189,7 +190,9 @@ async function describeAudio(
     env && typeof env === 'object' && !Array.isArray(env)
       ? (env as Record<string, number>)
       : undefined
-  return { analysis, envelope }
+  const polyphonic =
+    typeof parsed.polyphonic === 'boolean' ? parsed.polyphonic : undefined
+  return { analysis, envelope, polyphonic }
 }
 
 /** Pass 2 — design the minilogue xd program from the pass-1 analysis (no audio needed). */
@@ -257,7 +260,7 @@ export async function analyzeAudio(
   const ai = new GoogleGenAI({ apiKey }) as unknown as GenAI
 
   onProgress?.('Listening to the audio…')
-  const { analysis, envelope } = await describeAudio(
+  const { analysis, envelope, polyphonic } = await describeAudio(
     ai,
     model,
     file,
@@ -290,6 +293,35 @@ export async function analyzeAudio(
     const n = (v: number): string => (typeof v === 'number' ? v.toFixed(2) : '?')
     analysis.envelope = `attack ${n(envelope.attack)}, decay ${n(envelope.decay)}, sustain ${n(envelope.sustain)}, release ${n(envelope.release)}`
   }
+  // Voice mode follows the source — the model's own voice_mode was unreliable. Indices per
+  // parser/enums VOICE_MODE: 0 = POLY, 3 = UNISON. Mono → UNISON (thickened), poly → POLY.
+  if (typeof polyphonic === 'boolean') {
+    rawById.voice_mode = polyphonic ? 0 : 3
+    analysis.voice = polyphonic ? 'polyphonic → POLY' : 'monophonic → UNISON'
+  }
 
   return { rawById, name, rationale, analysis }
+}
+
+/** Design a patch directly from a free-text description (no audio) — runs the design pass only,
+ *  treating the user's words as the analysis. */
+export async function analyzeText(
+  description: string,
+  { apiKey, model = DEFAULT_MODEL, onProgress }: AnalyzeOptions,
+): Promise<GeminiProgram> {
+  if (!apiKey) throw new Error('Add your Gemini API key in settings first.')
+  const text = description.trim()
+  if (!text) throw new Error('Enter a patch description first.')
+
+  const { GoogleGenAI } = await import('@google/genai')
+  const ai = new GoogleGenAI({ apiKey }) as unknown as GenAI
+
+  onProgress?.('Designing the patch…')
+  const { program, name, rationale } = await designProgram(
+    ai,
+    model,
+    { description: text },
+    undefined,
+  )
+  return { rawById: programToRawById(program), name, rationale }
 }

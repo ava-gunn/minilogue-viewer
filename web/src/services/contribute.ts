@@ -5,7 +5,9 @@
 import { PROMPT_VERSION, SCHEMA_VERSION } from '../gemini/schema'
 
 export type Engine = 'builtin' | 'gemini'
-export type Rating = 'up' | 'down'
+/** 'as-is' = the generated patch is a good match; 'adjusted' = the user's hardware-tweaked
+ *  version (uploaded as a better label). No downvote. */
+export type Rating = 'as-is' | 'adjusted'
 
 export interface ContributionInput {
   file: File

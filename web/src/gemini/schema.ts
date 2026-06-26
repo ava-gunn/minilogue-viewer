@@ -158,6 +158,13 @@ export function buildAnalysisSchema(): GeminiSchema {
     envProps[id] = { type: 'NUMBER', description }
     envOrder.push(id)
   }
+  properties.polyphonic = {
+    type: 'BOOLEAN',
+    description:
+      'true if the source is polyphonic (a chord / multiple simultaneous notes) → POLY voice mode; false if a single note → UNISON',
+  }
+  ordering.push('polyphonic')
+
   properties.envelope = {
     type: 'OBJECT',
     description: 'numeric AMP envelope estimated from the waveform (each 0..1)',

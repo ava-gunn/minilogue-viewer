@@ -110,13 +110,18 @@
 
 .resynth-engine {
   display: flex;
-  align-items: center;
-  gap: 1.25rem;
+  flex-direction: column;
+  gap: 0.75rem;
   border: 1px solid var(--xd-divider, #44444e);
   border-radius: 0.5rem;
-  padding: 0.5rem 0.85rem;
+  padding: 0.5rem 0.85rem 0.75rem;
   font-size: 0.85rem;
   background: var(--xd-group-bg, #18181c);
+}
+.resynth-engine-row {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
 }
 
 .resynth-engine legend {
@@ -138,15 +143,14 @@
   cursor: not-allowed;
 }
 
+/* Lives inside the engine fieldset now — a divided section, not a separate box. */
 .resynth-creds {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 1rem;
-  padding: 0.75rem 0.85rem;
-  border: 1px solid var(--xd-divider, #44444e);
-  border-radius: 0.5rem;
-  background: var(--xd-group-bg, #18181c);
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--xd-divider, #44444e);
 }
 
 .resynth-field {
@@ -194,7 +198,10 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  align-content: center;
   gap: 0.75rem;
+  min-height: 5.5rem;
+  box-sizing: border-box;
   padding: 0.85rem;
   border: 1px dashed var(--xd-divider, #44444e);
   border-radius: 0.5rem;
@@ -219,10 +226,86 @@
   margin-left: auto;
 }
 
+/* Audio + text inputs side by side — mutually exclusive (selecting one disables the other). */
+.resynth-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.75rem 1rem;
+}
+/* Left column: the drop and the waveform swap in-place (same min-height → no layout shift). The
+   1.4rem top margin lines its box up with the textarea box, which sits below its 1.4rem label. */
+.resynth-audio {
+  flex: 1 1 18rem;
+  margin-top: 1.4rem;
+}
+.resynth-drop.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.resynth-or {
+  align-self: center;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.5;
+}
+.resynth-text-wrap {
+  display: flex;
+  flex: 1 1 18rem;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+}
+.resynth-text-label {
+  height: 1.1rem;
+  line-height: 1.1rem;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+.resynth-text {
+  font: inherit;
+  font-size: 0.82rem;
+  resize: vertical;
+  /* Match the audio box height so the two input outlines are equal. border-box so the 5.5rem
+     includes padding + border, exactly like the drop/preview boxes. */
+  box-sizing: border-box;
+  min-height: 5.5rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--xd-divider, #44444e);
+  background: var(--xd-group-bg, #18181c);
+  color: inherit;
+}
+.resynth-text:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.resynth-clear {
+  flex: none;
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0.15rem 0.3rem;
+  opacity: 0.6;
+}
+.resynth-clear:hover {
+  opacity: 1;
+}
+
 .resynth-preview {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.6rem;
+  min-height: 5.5rem;
+  box-sizing: border-box;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--xd-divider, #44444e);
+  border-radius: 0.5rem;
+  background: var(--xd-group-bg, #18181c);
 }
 
 .resynth-play {
@@ -245,12 +328,13 @@
   position: relative;
   flex: 1;
   min-width: 0;
+  align-self: stretch; /* fill the preview box height (it replaces the drop, same size) */
 }
 
 .resynth-wave {
   display: block;
   width: 100%;
-  height: 80px;
+  height: 100%;
   color: #7a7a85; /* waveform stroke (read via getComputedStyle in the canvas) */
   background: #08080a;
   border-radius: 0.4rem;
@@ -366,28 +450,6 @@
   margin-left: auto;
 }
 
-.resynth-thumb {
-  font-size: 1.1rem;
-  line-height: 1;
-  padding: 0.4rem 0.6rem;
-  border-radius: 0.4rem;
-  border: 1px solid var(--xd-divider, #44444e);
-  background: var(--wa-color-surface-raised, #1f1f24);
-  cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    background 0.15s ease;
-}
-
-.resynth-thumb:hover:not(:disabled) {
-  border-color: var(--wa-color-neutral-50, #8a8a93);
-}
-
-.resynth-thumb:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 /* Reduced motion: stop the spinner + control transitions (light DOM; the panel web
    components guard their own shadow-DOM animations). WCAG 2.3.3. */
 @media (prefers-reduced-motion: reduce) {
@@ -395,8 +457,7 @@
     animation: none;
   }
   .resynth-drop,
-  .resynth-btn,
-  .resynth-thumb {
+  .resynth-btn {
     transition: none;
   }
 }

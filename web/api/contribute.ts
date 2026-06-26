@@ -178,7 +178,10 @@ export async function POST(req: Request): Promise<Response> {
       meta.engine === 'builtin' || meta.engine === 'gemini'
         ? meta.engine
         : null,
-    rating: meta.rating === 'up' || meta.rating === 'down' ? meta.rating : null,
+    rating:
+      meta.rating === 'as-is' || meta.rating === 'adjusted'
+        ? meta.rating
+        : null,
     rationale:
       typeof meta.rationale === 'string' ? meta.rationale.slice(0, 800) : null,
     // Gemini's structured audio analysis — keep string fields only, length-capped.
