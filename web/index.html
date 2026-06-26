@@ -43,17 +43,7 @@
       <main id="main">
         <div id="panel-root"></div>
 
-        <!-- Resynthesis: toggles the form below; the form replaces the library while open. -->
-        <button
-          id="resynth-open"
-          class="resynth-open"
-          type="button"
-          aria-controls="resynth-form"
-        >
-          Resynthesis
-        </button>
-
-        <!-- Program library drawer (.mnlgxdlib) — shares the slot with the resynth form. -->
+        <!-- Below the synth: the program library OR the resynth form — whichever was opened last. -->
         <wa-details id="library-panel" summary="Program library" hidden>
           <div id="program-list" role="listbox" aria-label="Program library"></div>
         </wa-details>

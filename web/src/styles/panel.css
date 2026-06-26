@@ -188,7 +188,6 @@ xd-knob[data-param-key="modeDepth"]::part(label) {
 
 #library-panel {
   margin-top: var(--wa-space-m, 1rem);
-  padding-inline: var(--wa-space-m, 1rem);
 }
 #library-panel[hidden] {
   display: none;

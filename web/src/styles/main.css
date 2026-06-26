@@ -114,20 +114,18 @@
   opacity: 1;
 }
 
-/* ---- Resynthesis button (below the synth) --------------------------------- */
-/* Always present; clicking it replaces the button with the form (lazy-loaded on first click).
-   Inline width (fits its label), left-aligned with the synth's left edge. */
+/* ---- Resynthesis button (top-left in the MIDI bar) ------------------------ */
+/* Lives in the existing header bar (matches .midi-refresh's size so the bar doesn't grow / push
+   the synth down). Clicking it shows the form below; the form's JS/CSS is lazy-loaded on first
+   click. Left in the bar; #midi-status keeps its margin-inline-start:auto and stays right. */
 .resynth-open {
-  display: inline-block;
-  margin: var(--wa-space-m, 1rem) 0 0;
-  padding: 0.5rem 1.1rem;
+  padding: 0.3em 0.95em;
   font: inherit;
-  font-size: 0.9rem;
-  letter-spacing: 0.04em;
+  font-size: 0.85rem;
   color: var(--wa-color-neutral-on-normal, #e6e6ea);
   background: var(--xd-group-bg, #18181c);
   border: 1px solid var(--xd-divider, #44444e);
-  border-radius: 0.5rem;
+  border-radius: var(--wa-border-radius-m, 6px);
   cursor: pointer;
   transition: border-color 0.15s ease;
 }

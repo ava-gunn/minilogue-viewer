@@ -34,21 +34,16 @@ if (!RESYNTH_ENABLED) {
   openBtn?.setAttribute('disabled', '')
   openBtn?.setAttribute('title', 'Resynthesis is currently unavailable')
 } else {
-  let libraryLoaded = false
   let inited = false
 
-  // Clicking Resynthesis REPLACES the button with the form (not a toggle). Loading a library
-  // brings the button back and shows the library (the form is hidden again).
-  const showForm = (open: boolean): void => {
-    form?.toggleAttribute('hidden', !open)
-    openBtn?.toggleAttribute('hidden', open) // button is replaced by the form
-    library?.toggleAttribute('hidden', open || !libraryLoaded)
+  // Below the synth, show the form OR the library — whichever the user opened last (the header
+  // Resynthesis button shows the form; loading a .mnlgxdlib shows the library).
+  const show = (what: 'form' | 'library'): void => {
+    form?.toggleAttribute('hidden', what !== 'form')
+    library?.toggleAttribute('hidden', what !== 'library')
   }
 
-  on('file:parsed-lib', () => {
-    libraryLoaded = true
-    showForm(false)
-  })
+  on('file:parsed-lib', () => show('library'))
 
   openBtn?.addEventListener('click', async () => {
     if (!inited) {
@@ -56,7 +51,7 @@ if (!RESYNTH_ENABLED) {
       initResynth(link)
       inited = true
     }
-    showForm(true)
+    show('form')
   })
 
   // Deep link: the Ableton embed / a /resynth redirect lands on /?resynth=1 → open the form.
