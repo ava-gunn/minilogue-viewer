@@ -41,7 +41,7 @@ def cosine_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
 def _load_data(data_dir: Path) -> tuple[torch.Tensor, torch.Tensor]:
     rows = [json.loads(line) for line in (data_dir / "samples.jsonl").read_text().splitlines()]
     x = np.stack([paramvec.targets_to_vector(r) for r in rows])
-    y = np.asarray(np.load(data_dir / "embeddings.npy", mmap_mode="r"), dtype=np.float32)
+    y = np.array(np.load(data_dir / "embeddings.npy", mmap_mode="r"), dtype=np.float32)  # copy: writable for torch
     if len(x) != len(y):
         raise SystemExit(f"params/embeddings mismatch: {len(x)} rows vs {len(y)} embeddings")
     return torch.from_numpy(x), F.normalize(torch.from_numpy(y), dim=-1)

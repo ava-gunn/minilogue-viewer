@@ -43,7 +43,7 @@ def load_sweep(data_dir: Path) -> tuple[np.ndarray, torch.Tensor, torch.Tensor]:
     """Returns (mels [N, N_MELS, N_FRAMES] memmap, embeddings [N, E] unit-norm,
     param vectors [N, VEC_DIM]), all row-aligned to clip id."""
     rows = [json.loads(line) for line in (data_dir / "samples.jsonl").read_text().splitlines()]
-    emb = np.asarray(np.load(data_dir / "embeddings.npy", mmap_mode="r"), dtype=np.float32)
+    emb = np.array(np.load(data_dir / "embeddings.npy", mmap_mode="r"), dtype=np.float32)  # copy: writable for torch
     if len(emb) != len(rows):
         raise SystemExit(f"samples/embeddings mismatch: {len(rows)} rows vs {len(emb)} embeddings")
     mels = _precompute_mels(data_dir, rows)

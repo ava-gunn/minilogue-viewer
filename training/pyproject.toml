@@ -16,8 +16,9 @@ dependencies = [
 train = ["torch", "librosa"]
 # XD SysEx recording rig (Phase 4b).
 record = ["mido", "python-rtmidi", "sounddevice", "soundfile"]
-# CLAP audio embeddings for the proxy target (Stage 2). Also needs the `train` extra (torch).
-proxy = ["laion-clap", "librosa"]
+# CLAP audio embeddings for the proxy target (Stage 2). Also needs the `train` extra (torch);
+# torchvision must match the installed torch (laion-clap imports it but doesn't pin it).
+proxy = ["laion-clap", "torchvision", "librosa"]
 # Real-world resynthesis eval (eval/): model inference + audio similarity metrics.
 # Add the `record` extra too for the automated hardware loop (--hardware).
 eval = ["librosa", "soundfile"]
