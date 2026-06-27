@@ -44,3 +44,5 @@ training/.nightly.lock
 
 # local-only working files (audio targets, patch libraries, scratch notes), kept out of git
 /_local/
+.vercel
+.env*
