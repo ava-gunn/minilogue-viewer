@@ -76,7 +76,7 @@ def build_dummy() -> onnx.ModelProto:
     return model
 
 
-def build_real(checkpoint: Path) -> None:
+def build_real(checkpoint: Path, out: Path) -> None:
     import torch
 
     from training.model.encoder import SoundMatchEncoder
@@ -85,10 +85,10 @@ def build_real(checkpoint: Path) -> None:
     model.load_state_dict(torch.load(checkpoint, map_location="cpu"))
     model.eval()
     sample = torch.zeros(schema.INPUT_SHAPE, dtype=torch.float32)
-    _OUT.parent.mkdir(parents=True, exist_ok=True)
+    out.parent.mkdir(parents=True, exist_ok=True)
     # Export to a temp path then rename, so the browser (or a self-check) never reads a
     # half-written model — e.g. a retrain re-exporting while the app fetches it.
-    tmp = _OUT.with_name(_OUT.name + ".tmp")
+    tmp = out.with_name(out.name + ".tmp")
     torch.onnx.export(
         model,
         sample,
@@ -100,11 +100,11 @@ def build_real(checkpoint: Path) -> None:
         # torch 2.9 flips the default to the dynamo exporter; don't let that change silently.
         dynamo=False,
     )
-    tmp.replace(_OUT)
+    tmp.replace(out)
 
 
-def self_check() -> None:
-    sess = ort.InferenceSession(str(_OUT), providers=["CPUExecutionProvider"])
+def self_check(out: Path) -> None:
+    sess = ort.InferenceSession(str(out), providers=["CPUExecutionProvider"])
     x = np.zeros(schema.INPUT_SHAPE, dtype=np.float32)
     outs = sess.run(None, {schema.INPUT_NAME: x})
     shapes = {o.name: list(t.shape) for o, t in zip(sess.get_outputs(), outs)}
@@ -122,15 +122,16 @@ def main() -> None:
     group = ap.add_mutually_exclusive_group(required=True)
     group.add_argument("--dummy", action="store_true", help="random contract-shaped model")
     group.add_argument("--checkpoint", type=Path, help="trained encoder state_dict (.pt)")
+    ap.add_argument("-o", "--out", type=Path, default=_OUT, help="output .onnx (default: the web app's model)")
     args = ap.parse_args()
 
-    _OUT.parent.mkdir(parents=True, exist_ok=True)
+    args.out.parent.mkdir(parents=True, exist_ok=True)
     if args.dummy:
-        atomic_write_bytes(_OUT, build_dummy().SerializeToString())
+        atomic_write_bytes(args.out, build_dummy().SerializeToString())
     else:
-        build_real(args.checkpoint)
-    self_check()
-    print(f"wrote {_OUT}")
+        build_real(args.checkpoint, args.out)
+    self_check(args.out)
+    print(f"wrote {args.out}")
 
 
 if __name__ == "__main__":

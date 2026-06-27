@@ -18,7 +18,14 @@ import torch.nn.functional as F
 
 from training import paramvec, schema
 from training.data import mel as mel_mod
-from training.data.embed import read_wav
+from training.data.embed import RMS_FLOOR, read_wav
+
+
+def audible_mask(rows: list[dict]) -> np.ndarray:
+    """Keep-mask dropping near-silent clips (rms < RMS_FLOOR): their CLAP embedding carries no
+    timbre, so they only add noise to the proxy/encoder. Rows lacking rms are kept.
+    embeddings.npy / mels.npy stay full-length on disk — we filter in memory at load time."""
+    return np.array([r.get("rms", 1.0) >= RMS_FLOOR for r in rows], dtype=bool)
 
 
 def _precompute_mels(data_dir: Path, rows: list[dict]) -> np.ndarray:
@@ -50,8 +57,13 @@ def load_sweeps(dirs: list[Path]) -> tuple[np.ndarray, torch.Tensor, torch.Tenso
         emb = np.array(np.load(d / "embeddings.npy", mmap_mode="r"), dtype=np.float32)  # copy: writable for torch
         if len(emb) != len(rows):
             raise SystemExit(f"{d}: {len(rows)} rows vs {len(emb)} embeddings")
-        mels_p.append(np.asarray(_precompute_mels(d, rows)))
-        emb_p.append(emb)
+        mels = np.asarray(_precompute_mels(d, rows))  # full-length, positional to rows
+        keep = audible_mask(rows)
+        if not keep.all():
+            print(f"{d}: dropping {int((~keep).sum())}/{len(rows)} near-silent clips (rms<{RMS_FLOOR})")
+        rows = [r for r, k in zip(rows, keep) if k]
+        mels_p.append(mels[keep])
+        emb_p.append(emb[keep])
         par_p.append(np.stack([paramvec.targets_to_vector(r) for r in rows]))
         ev.extend(r.get("split") == "eval" for r in rows)
     emb = F.normalize(torch.from_numpy(np.concatenate(emb_p)), dim=-1)

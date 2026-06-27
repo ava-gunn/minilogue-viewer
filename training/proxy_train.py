@@ -11,6 +11,7 @@ Requires torch (the `train` extra). Run from the repo root.
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 from pathlib import Path
 
@@ -20,6 +21,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from training import paramvec, xd_params
+from training.data.sweep_dataset import RMS_FLOOR, audible_mask
 from training.model import proxy as proxy_model
 
 
@@ -47,8 +49,12 @@ def _load_data(dirs: list[Path]) -> tuple[torch.Tensor, torch.Tensor, torch.Tens
         y = np.array(np.load(d / "embeddings.npy", mmap_mode="r"), dtype=np.float32)  # copy: writable for torch
         if len(rows) != len(y):
             raise SystemExit(f"{d}: {len(rows)} rows vs {len(y)} embeddings")
+        keep = audible_mask(rows)
+        if not keep.all():
+            print(f"{d}: dropping {int((~keep).sum())}/{len(rows)} near-silent clips (rms<{RMS_FLOOR})")
+        rows = [r for r, k in zip(rows, keep) if k]
         xs.append(np.stack([paramvec.targets_to_vector(r) for r in rows]))
-        ys.append(y)
+        ys.append(y[keep])
         ev.extend(r.get("split") == "eval" for r in rows)
     return (
         torch.from_numpy(np.concatenate(xs)),
@@ -90,6 +96,7 @@ def train(model, x, y, *, epochs, batch, lr, val_frac, device, seed, eval_mask=N
     start = _val_cosine(model, xva, yva)
     print(f"val cosine @init: {start:.4f}  (train {len(ti)}, val {len(vi)})")
     best = start
+    best_state = copy.deepcopy(model.state_dict())
     for ep in range(1, epochs + 1):
         model.train()
         for b in torch.randperm(len(xtr), generator=torch.Generator().manual_seed(seed + ep)).split(batch):
@@ -97,9 +104,11 @@ def train(model, x, y, *, epochs, batch, lr, val_frac, device, seed, eval_mask=N
             cosine_loss(model(xtr[b]), ytr[b]).backward()
             opt.step()
         v = _val_cosine(model, xva, yva)
-        best = max(best, v)
+        if v > best:
+            best, best_state = v, copy.deepcopy(model.state_dict())
         if ep % max(1, epochs // 10) == 0 or ep == epochs:
             print(f"epoch {ep:>3}: val cosine {v:.4f}")
+    model.load_state_dict(best_state)  # restore the best epoch, not the last
     return best
 
 

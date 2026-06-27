@@ -25,6 +25,7 @@ Requires torch (the `train` extra). Run from the repo root.
 from __future__ import annotations
 
 import argparse
+import copy
 from pathlib import Path
 
 import numpy as np
@@ -115,6 +116,7 @@ def train(
     print(f"{label} cosine @init: {cosine_on(report_idx, temp):.4f}  (train {len(tr_idx)}, "
           f"val {len(val_idx)}, schedule={schedule}, aux_cont={aux_weight}, aux_cat={dw})")
     best = -1.0
+    best_state = copy.deepcopy(encoder.state_dict())
     for ep in range(1, epochs + 1):
         prog = (ep - 1) / max(1, epochs - 1)
         t = temp + (temp_final - temp) * prog
@@ -143,9 +145,11 @@ def train(
             loss.backward()
             opt.step()
         v = cosine_on(report_idx, temp_final)
-        best = max(best, v)
+        if v > best:
+            best, best_state = v, copy.deepcopy(encoder.state_dict())
         if ep % max(1, epochs // 10) == 0 or ep == epochs:
             print(f"epoch {ep:>3}: {label} cosine {v:.4f}  (ew={ew:.2f} pc={pw_cont:.2f} pk={pw_cat:.2f})")
+    encoder.load_state_dict(best_state)  # restore the best epoch, not the last
     return best
 
 

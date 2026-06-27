@@ -21,6 +21,8 @@ import numpy as np
 
 TARGET_SR = 48000  # laion-clap operates at 48 kHz
 EMBED_DIM = 512
+RMS_FLOOR = 1e-3  # near-silent clips: skip the CLAP forward, store a zero row (the dataset
+# loaders drop these via audible_mask). Same floor as xd_record / render_presets.
 
 
 def read_wav(path: Path) -> tuple[np.ndarray, int]:
@@ -73,14 +75,20 @@ def main() -> None:
     print(f"embedding {n - done}/{n} clips (resume from {done}) -> {emb_path}")
 
     embedder = ClapEmbedder(args.ckpt)
+    skipped = 0
     for lo in range(done, n, args.batch):
         chunk = rows[lo : lo + args.batch]
-        clips, sr = zip(*(read_wav(args.data / "audio" / f"{r['id']:06d}.wav") for r in chunk))
-        embeddings[lo : lo + len(chunk)] = embedder.embed_batch(list(clips), sr[0])
+        audible = [j for j, r in enumerate(chunk) if r.get("rms", 1.0) >= RMS_FLOOR]
+        block = np.zeros((len(chunk), EMBED_DIM), dtype=np.float32)  # silent rows stay zero
+        if audible:
+            clips, sr = zip(*(read_wav(args.data / "audio" / f"{chunk[j]['id']:06d}.wav") for j in audible))
+            block[audible] = embedder.embed_batch(list(clips), sr[0])
+        skipped += len(chunk) - len(audible)
+        embeddings[lo : lo + len(chunk)] = block
         embeddings.flush()
         meta_path.write_text(json.dumps({"n": n, "dim": EMBED_DIM, "target_sr": TARGET_SR, "done": lo + len(chunk)}))
         print(f"{lo + len(chunk)}/{n} embedded")
-    print(f"done: {n} embeddings at {emb_path}")
+    print(f"done: {n} embeddings at {emb_path} ({skipped} near-silent rows zero-filled, rms<{RMS_FLOOR})")
 
 
 if __name__ == "__main__":
