@@ -9,7 +9,6 @@
   },
   "scripts": {
     "dev": "pnpm -C web dev",
-    "local": "bash scripts/dev-local.sh",
     "build": "pnpm -C web build",
     "preview": "pnpm -C web preview",
     "test": "pnpm -C web test",
@@ -18,10 +17,7 @@
     "check": "pnpm -C web check",
     "lint": "pnpm -C web lint",
     "format": "pnpm -C web format",
-    "build:schema": "pnpm -C web build:schema",
-    "daemon:start": "bash scripts/daemon.sh start",
-    "daemon:stop": "bash scripts/daemon.sh stop",
-    "daemon:status": "bash scripts/daemon.sh status"
+    "build:schema": "pnpm -C web build:schema"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1"

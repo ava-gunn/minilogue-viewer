@@ -49,8 +49,12 @@ function clientIp(req: Request): string {
 /** Per-IP fixed-window limit via the Vercel KV (Upstash) REST API. Fails OPEN when KV is
  *  unconfigured or errors — availability over strictness, since Turnstile is the real gate. */
 async function rateLimited(ip: string): Promise<boolean> {
-  const url = process.env.KV_REST_API_URL
-  const auth = process.env.KV_REST_API_TOKEN
+  // Vercel sunset first-party KV; the Marketplace Upstash integration now injects
+  // UPSTASH_REDIS_REST_*. Accept either (KV_* kept for any pre-migration stores). Both speak the
+  // same Upstash REST API (/pipeline + Bearer), so only the env-var names differ.
+  const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL
+  const auth =
+    process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN
   if (!url || !auth) {
     if (process.env.VERCEL_ENV === 'production') {
       console.warn('rate limiting disabled: KV not configured')

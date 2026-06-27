@@ -34,9 +34,9 @@ randomBtn?.addEventListener('click', () => {
   if (template) link.sendProgram(writeProgBin(template, raw))
 })
 
-// Gated by the VITE_RESYNTH_ENABLED env var; the resynth bundle is lazy-imported on first click.
-const flag = String(import.meta.env.VITE_RESYNTH_ENABLED ?? '').toLowerCase()
-const RESYNTH_ENABLED = flag === 'true' || flag === '1' || flag === 'on'
+// On by default; set VITE_RESYNTH_ENABLED=false (or 0/off) to hide it. Bundle lazy-imported on first click.
+const flag = String(import.meta.env.VITE_RESYNTH_ENABLED ?? 'true').toLowerCase()
+const RESYNTH_ENABLED = flag !== 'false' && flag !== '0' && flag !== 'off'
 
 const openBtn = document.getElementById('resynth-open')
 const form = document.getElementById('resynth-form')

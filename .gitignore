@@ -37,8 +37,6 @@ training/data/hard_cases/
 training/data/contrib/
 training/data/contrib_accepted/
 training/eval/set/
-training/.daemon.pid
-training/.daemon.log
 training/.nightly.log
 training/.nightly.lock
 

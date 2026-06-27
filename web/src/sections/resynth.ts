@@ -29,7 +29,6 @@ import {
   turnstileEnabled,
   turnstileToken,
 } from '../services/turnstile'
-import { isLocalhost, verifyOnHardware } from '../services/verify'
 
 const STEPS = ['upload', 'patch', 'try', 'feedback'] as const
 type Step = (typeof STEPS)[number]
@@ -98,6 +97,8 @@ export function initResynth(link: SynthLink): void {
   const filename = byId('resynth-filename')
   const clearBtn = byId<HTMLButtonElement>('resynth-clear')
   const textInput = byId<HTMLTextAreaElement>('resynth-text')
+  const textWrap = byId('resynth-text-wrap')
+  const orSep = byId('resynth-or')
 
   const preview = byId('resynth-preview')
   const canvas = byId<HTMLCanvasElement>('resynth-wave')
@@ -136,9 +137,11 @@ export function initResynth(link: SynthLink): void {
 
   let connected = false
   const updateLoad = (): void => {
-    loadBtn?.toggleAttribute('hidden', !connected)
-    if (loadBtn)
-      loadBtn.disabled = !(connected && link.getTemplate() && rawById)
+    // Read live state (a captured template implies a connected+dumped synth) rather than the
+    // `connected` event — initResynth is lazy and can miss it if MIDI connected before opening.
+    const ready = !!(link.getTemplate() && rawById)
+    loadBtn?.toggleAttribute('hidden', !ready)
+    if (loadBtn) loadBtn.disabled = !ready
   }
 
   if (modelSel && modelSel.options.length === 0) {
@@ -152,10 +155,15 @@ export function initResynth(link: SynthLink): void {
   const syncEngine = (): void => {
     const gemini = engine() === 'gemini'
     creds?.toggleAttribute('hidden', !gemini)
+    // Text -> params is Gemini-only; the built-in model matches from audio, so hide the
+    // "or / Describe a patch" input for it.
+    textWrap?.toggleAttribute('hidden', !gemini)
+    orSep?.toggleAttribute('hidden', !gemini)
     if (gemini) {
       if (keyInput) keyInput.value = getApiKey()
       if (modelSel) modelSel.value = getModel()
     }
+    updateGenerate()
   }
   builtinRadio?.addEventListener('change', syncEngine)
   geminiRadio?.addEventListener('change', syncEngine)
@@ -169,7 +177,7 @@ export function initResynth(link: SynthLink): void {
   let waveformReady = false
 
   const updateGenerate = (): void => {
-    const hasText = !!textInput?.value.trim()
+    const hasText = engine() === 'gemini' && !!textInput?.value.trim()
     if (generateBtn)
       generateBtn.disabled = !((file && waveformReady) || hasText)
   }
@@ -270,7 +278,7 @@ export function initResynth(link: SynthLink): void {
 
   // Audio and text inputs are mutually exclusive: content in one disables the other.
   const syncInputs = (): void => {
-    const hasText = !!textInput?.value.trim()
+    const hasText = engine() === 'gemini' && !!textInput?.value.trim()
     if (textInput) textInput.disabled = !!file
     if (fileBtn) fileBtn.disabled = hasText
     drop?.classList.toggle('disabled', hasText)
@@ -337,7 +345,7 @@ export function initResynth(link: SynthLink): void {
     const f = file
     if (!f && !text) return
     const eng = engine()
-    const useText = !f
+    const useText = !f && eng === 'gemini'
     // Text generation is Gemini-only; audio uses the selected engine. Either way Gemini needs a key.
     if (!hasApiKey() && (useText || eng === 'gemini')) {
       setStatus('Enter your Gemini API token first.')
@@ -401,7 +409,7 @@ export function initResynth(link: SynthLink): void {
       // A pure text patch has no audio to contribute: hide the thumbs row and skip the captcha.
       feedback?.removeAttribute('hidden')
       feedbackRow?.toggleAttribute('hidden', useText)
-      if (!useText && !isLocalhost() && turnstileBox) {
+      if (!useText && turnstileBox) {
         void mountTurnstile(turnstileBox)
       }
       setStep('try')
@@ -445,38 +453,6 @@ export function initResynth(link: SynthLink): void {
     const reenable = (): void => {
       if (asIsBtn) asIsBtn.disabled = false
       if (mineBtn) mineBtn.disabled = false
-    }
-
-    // On localhost the daemon loads, records, and scores on the XD, folding verified patches into training.
-    if (isLocalhost()) {
-      setStatus(
-        kind === 'adjusted'
-          ? 'Verifying your version on the XD…'
-          : 'Verifying on your minilogue xd…',
-      )
-      try {
-        const r = await verifyOnHardware({
-          file,
-          rawById: submitRaw,
-          pitchMidi: Number(pitchSel?.value ?? 60),
-          engine: engine(),
-        })
-        markDone()
-        setStatus(
-          r.promoted
-            ? `Verified ✓ mel_l1 ${r.mel_l1} (weight ${r.weight}) — added to training (${r.verified_total} verified).`
-            : `Didn’t match on the XD (mel_l1 ${r.mel_l1}) — not added.`,
-        )
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err)
-        setStatus('')
-        toast(
-          `Local verify failed: ${message}. Is the daemon running? (pnpm daemon:start)`,
-          'danger',
-        )
-        reenable()
-      }
-      return
     }
 
     const tsToken = turnstileToken()

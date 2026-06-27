@@ -76,11 +76,11 @@
               <legend>Model</legend>
               <div class="resynth-engine-row">
                 <label>
-                  <input type="radio" name="resynth-engine" id="engine-builtin" value="builtin" disabled />
+                  <input type="radio" name="resynth-engine" id="engine-builtin" value="builtin" checked />
                   Built-in model
                 </label>
                 <label>
-                  <input type="radio" name="resynth-engine" id="engine-gemini" value="gemini" checked />
+                  <input type="radio" name="resynth-engine" id="engine-gemini" value="gemini" />
                   Gemini
                 </label>
               </div>
@@ -123,8 +123,8 @@
                   <audio id="resynth-audio" preload="metadata"></audio>
                 </div>
               </div>
-              <span class="resynth-or" aria-hidden="true">or</span>
-              <label class="resynth-text-wrap">
+              <span id="resynth-or" class="resynth-or" aria-hidden="true">or</span>
+              <label id="resynth-text-wrap" class="resynth-text-wrap">
                 <span class="resynth-text-label">Describe a patch</span>
                 <textarea id="resynth-text" class="resynth-text" rows="3"
                   placeholder="e.g. warm analog pad, slow attack, long reverb tail, slight detune between oscillators"></textarea>
