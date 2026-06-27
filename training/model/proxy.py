@@ -33,8 +33,9 @@ def _split(params: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tens
 
 
 class ParamProxy(nn.Module):
-    def __init__(self, embed_dim: int = EMBED_DIM, hidden: int = 512, depth: int = 4) -> None:
+    def __init__(self, embed_dim: int = EMBED_DIM, hidden: int = 512, depth: int = 4, normalize: bool = True) -> None:
         super().__init__()
+        self.normalize = normalize
         blocks: list[nn.Module] = [nn.Linear(paramvec.VEC_DIM, hidden), nn.LayerNorm(hidden), nn.GELU()]
         for _ in range(depth - 1):
             blocks += [nn.Linear(hidden, hidden), nn.LayerNorm(hidden), nn.GELU()]
@@ -42,7 +43,8 @@ class ParamProxy(nn.Module):
         self.head = nn.Linear(hidden, embed_dim)
 
     def forward(self, params: torch.Tensor) -> torch.Tensor:
-        return torch.nn.functional.normalize(self.head(self.net(params)), dim=-1)
+        out = self.head(self.net(params))
+        return torch.nn.functional.normalize(out, dim=-1) if self.normalize else out
 
 
 class ParamProxyTransformer(nn.Module):
@@ -53,9 +55,10 @@ class ParamProxyTransformer(nn.Module):
 
     def __init__(
         self, embed_dim: int = EMBED_DIM, d_token: int = 192, layers: int = 4, heads: int = 6,
-        ff: int | None = None, dropout: float = 0.1,
+        ff: int | None = None, dropout: float = 0.1, normalize: bool = True,
     ) -> None:
         super().__init__()
+        self.normalize = normalize
         nc, td, nb = schema.N_CONTINUOUS, schema.TOTAL_DISCRETE, schema.N_BOOLEAN
         self._nc, self._td = nc, td
         self._disc_slices: list[tuple[int, int]] = []
@@ -85,16 +88,19 @@ class ParamProxyTransformer(nn.Module):
         disc_tok = torch.stack([disc[:, a:b] @ self.disc_w[a:b] for a, b in self._disc_slices], dim=1)
         tokens = torch.cat([cont_tok, disc_tok, bool_tok], dim=1)
         x = torch.cat([self.cls.expand(tokens.size(0), -1, -1), tokens], dim=1) + self.pos
-        return torch.nn.functional.normalize(self.head(self.encoder(x)[:, 0]), dim=-1)
+        out = self.head(self.encoder(x)[:, 0])
+        return torch.nn.functional.normalize(out, dim=-1) if self.normalize else out
 
 
-def build_proxy(arch: str = "mlp", embed_dim: int = EMBED_DIM, **cfg) -> nn.Module:
+def build_proxy(arch: str = "mlp", embed_dim: int = EMBED_DIM, normalize: bool = True, **cfg) -> nn.Module:
     """Construct a proxy by name. cfg keys: mlp -> hidden, depth; transformer -> d_token,
-    layers, heads. Used by proxy_train (new) and encoder_train (reconstruct from checkpoint)."""
+    layers, heads. normalize=False gives a raw (non-unit) output for a spectral/log-mel target.
+    Used by proxy_train / mel_proxy_train and encoder_train (reconstruct from checkpoint)."""
     if arch == "mlp":
-        return ParamProxy(embed_dim, hidden=cfg.get("hidden", 512), depth=cfg.get("depth", 4))
+        return ParamProxy(embed_dim, hidden=cfg.get("hidden", 512), depth=cfg.get("depth", 4), normalize=normalize)
     if arch == "transformer":
         return ParamProxyTransformer(
-            embed_dim, d_token=cfg.get("d_token", 192), layers=cfg.get("layers", 4), heads=cfg.get("heads", 6)
+            embed_dim, d_token=cfg.get("d_token", 192), layers=cfg.get("layers", 4),
+            heads=cfg.get("heads", 6), normalize=normalize,
         )
     raise ValueError(f"unknown proxy arch {arch!r}")

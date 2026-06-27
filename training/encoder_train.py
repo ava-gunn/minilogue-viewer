@@ -56,7 +56,7 @@ def _load_proxy(path: Path, device: torch.device) -> torch.nn.Module:
     ckpt = torch.load(path, map_location=device)
     arch = ckpt.get("arch", "mlp")  # tolerate older mlp-only checkpoints
     cfg = ckpt.get("config") or {"hidden": ckpt.get("hidden", 512), "depth": ckpt.get("depth", 4)}
-    proxy = proxy_model.build_proxy(arch, embed_dim=ckpt["embed_dim"], **cfg)
+    proxy = proxy_model.build_proxy(arch, embed_dim=ckpt["embed_dim"], normalize=ckpt.get("normalize", True), **cfg)
     proxy.load_state_dict(ckpt["state_dict"])
     proxy.eval().requires_grad_(False)
     return proxy.to(device)
@@ -79,7 +79,7 @@ def _param_loss(cont, disc_logits, boolean, true_cont, true_disc, true_bool):
 def train(
     encoder, proxy, mels, emb, params, *,
     temp, temp_final, schedule, aux_weight, disc_weight=None, embed_warmup, epochs, batch, lr,
-    val_frac, device, seed, is_eval=None,
+    val_frac, device, seed, is_eval=None, mel_proxy=None, spectral_weight=0.0,
 ) -> float:
     n = len(mels)
     if is_eval is not None and bool(is_eval.any()):  # held-out presets are the val set
@@ -91,6 +91,10 @@ def train(
         val_idx, tr_idx = perm[:n_val], perm[n_val:]
     emb, params = emb.to(device), params.to(device)
     encoder, proxy = encoder.to(device), proxy.to(device)
+    pooled = None  # params->spectral-envelope target for the optional mel-proxy L1 term
+    if mel_proxy is not None:
+        mel_proxy = mel_proxy.to(device)
+        pooled = torch.from_numpy(np.asarray(mels).mean(-1).astype(np.float32)).to(device)
     opt = torch.optim.AdamW(encoder.parameters(), lr=lr)
 
     # Ground-truth heads (recovered from the 117-d one-hot vector) for the parameter loss.
@@ -142,13 +146,15 @@ def train(
             if pw_cont or pw_cat:
                 cont_l, cat_l = _param_loss(c, d, bo, true_cont[idx], true_disc[idx], true_bool[idx])
                 loss = loss + pw_cont * cont_l + pw_cat * cat_l
+            if mel_proxy is not None and spectral_weight:
+                loss = loss + spectral_weight * F.l1_loss(mel_proxy(proxy_input(c, d, bo, t)), pooled[idx])
             loss.backward()
             opt.step()
         v = cosine_on(report_idx, temp_final)
         if v > best:
             best, best_state = v, copy.deepcopy(encoder.state_dict())
         if ep % max(1, epochs // 10) == 0 or ep == epochs:
-            print(f"epoch {ep:>3}: {label} cosine {v:.4f}  (ew={ew:.2f} pc={pw_cont:.2f} pk={pw_cat:.2f})")
+            print(f"epoch {ep:>3}: {label} cosine {v:.4f}  (ew={ew:.2f} pc={pw_cont:.2f} pk={pw_cat:.2f} sp={spectral_weight:.2f})")
     encoder.load_state_dict(best_state)  # restore the best epoch, not the last
     return best
 
@@ -198,6 +204,8 @@ def main() -> None:
                     help="categorical (discrete CE + boolean BCE) loss weight; stays on across the schedule "
                          "(default: same as --aux-weight). Unlike --aux-weight it does NOT decay under switch")
     ap.add_argument("--embed-warmup", type=float, default=0.33, help="fraction of training to ramp embedding loss 0->1")
+    ap.add_argument("--mel-proxy", type=Path, help="optional spectral proxy (training.mel_proxy_train) for a pooled log-mel L1 term")
+    ap.add_argument("--spectral-weight", type=float, default=0.0, help="weight of the spectral (pooled log-mel) L1 loss; 0 = off")
     ap.add_argument("--device", default=None)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--smoke", action="store_true", help="fit random mels through a frozen random proxy")
@@ -217,12 +225,14 @@ def main() -> None:
     if args.init:  # finetune: warm-start from the synthetic-pretrained encoder
         encoder.load_state_dict(torch.load(args.init, map_location="cpu"))
         print(f"warm-started from {args.init}")
+    mel_proxy = _load_proxy(args.mel_proxy, device) if args.mel_proxy else None
     best = train(
         encoder, _load_proxy(args.proxy, device), mels, emb, params,
         temp=args.temperature, temp_final=args.temperature_final or args.temperature,
         schedule=args.schedule, aux_weight=args.aux_weight, disc_weight=args.disc_weight,
         embed_warmup=args.embed_warmup, epochs=args.epochs, batch=args.batch, lr=args.lr,
         val_frac=args.val_frac, device=device, seed=args.seed, is_eval=is_eval,
+        mel_proxy=mel_proxy, spectral_weight=args.spectral_weight,
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     torch.save(encoder.state_dict(), args.out)  # raw state_dict -> training.export --checkpoint
