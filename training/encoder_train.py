@@ -80,6 +80,7 @@ def train(
     encoder, proxy, mels, emb, params, *,
     temp, temp_final, schedule, aux_weight, disc_weight=None, embed_warmup, epochs, batch, lr,
     val_frac, device, seed, is_eval=None, mel_proxy=None, spectral_weight=0.0,
+    melspec_proxy=None, melspec_weight=0.0, clap_weight=1.0,
 ) -> float:
     n = len(mels)
     if is_eval is not None and bool(is_eval.any()):  # held-out presets are the val set
@@ -91,10 +92,12 @@ def train(
         val_idx, tr_idx = perm[:n_val], perm[n_val:]
     emb, params = emb.to(device), params.to(device)
     encoder, proxy = encoder.to(device), proxy.to(device)
-    pooled = None  # params->spectral-envelope target for the optional mel-proxy L1 term
+    pooled = None  # params->spectral-envelope target for the optional pooled mel-proxy L1 term
     if mel_proxy is not None:
         mel_proxy = mel_proxy.to(device)
         pooled = torch.from_numpy(np.asarray(mels).mean(-1).astype(np.float32)).to(device)
+    if melspec_proxy is not None:
+        melspec_proxy = melspec_proxy.to(device)
     opt = torch.optim.AdamW(encoder.parameters(), lr=lr)
 
     # Ground-truth heads (recovered from the 117-d one-hot vector) for the parameter loss.
@@ -109,17 +112,26 @@ def train(
         return torch.from_numpy(np.asarray(mels[idx])).unsqueeze(1).to(device)
 
     @torch.no_grad()
-    def cosine_on(idx: list[int], temperature: float) -> float:
+    def evaluate(idx: list[int], temperature: float) -> tuple[float, float]:
         encoder.eval()
-        c, d, b = encoder(melbatch(idx))
-        return float((proxy(proxy_input(c, d, b, temperature)) * emb[idx]).sum(-1).mean())
+        mb = melbatch(idx)
+        c, d, b = encoder(mb)
+        pin = proxy_input(c, d, b, temperature)
+        cos = float((proxy(pin) * emb[idx]).sum(-1).mean())
+        ms = float(F.l1_loss(melspec_proxy(pin), mb[:, 0])) if melspec_proxy is not None else float("nan")
+        return cos, ms
 
     dw = aux_weight if disc_weight is None else disc_weight
     report_idx = val_idx if val_idx else tr_idx[: min(512, len(tr_idx))]
     label = "val" if val_idx else "train"
-    print(f"{label} cosine @init: {cosine_on(report_idx, temp):.4f}  (train {len(tr_idx)}, "
-          f"val {len(val_idx)}, schedule={schedule}, aux_cont={aux_weight}, aux_cat={dw})")
-    best = -1.0
+    # When the full-mel proxy is active it IS the objective ("sound like the source"); track best
+    # by its reconstruction L1 (lower=better). Otherwise track CLAP cosine (higher=better).
+    use_ms = melspec_proxy is not None and melspec_weight > 0
+    ic, ims = evaluate(report_idx, temp)
+    print(f"{label} @init: cosine {ic:.4f}" + (f" melspec_l1 {ims:.4f}" if use_ms else "")
+          + f"  (train {len(tr_idx)}, val {len(val_idx)}, schedule={schedule}, "
+          f"aux_cont={aux_weight}, aux_cat={dw}, clap_w={clap_weight}, melspec_w={melspec_weight})")
+    best_obj = -ims if use_ms else ic  # maximize either way
     best_state = copy.deepcopy(encoder.state_dict())
     for ep in range(1, epochs + 1):
         prog = (ep - 1) / max(1, epochs - 1)
@@ -139,24 +151,30 @@ def train(
         for b in order.split(batch):
             idx = [tr_idx[i] for i in b.tolist()]
             opt.zero_grad()
-            c, d, bo = encoder(melbatch(idx))
+            mb = melbatch(idx)
+            c, d, bo = encoder(mb)
+            pin = proxy_input(c, d, bo, t)
             loss = bo.new_zeros(())
-            if ew:
-                loss = loss + ew * cosine_loss(proxy(proxy_input(c, d, bo, t)), emb[idx])
+            if clap_weight and ew:
+                loss = loss + clap_weight * ew * cosine_loss(proxy(pin), emb[idx])
             if pw_cont or pw_cat:
                 cont_l, cat_l = _param_loss(c, d, bo, true_cont[idx], true_disc[idx], true_bool[idx])
                 loss = loss + pw_cont * cont_l + pw_cat * cat_l
             if mel_proxy is not None and spectral_weight:
-                loss = loss + spectral_weight * F.l1_loss(mel_proxy(proxy_input(c, d, bo, t)), pooled[idx])
+                loss = loss + spectral_weight * F.l1_loss(mel_proxy(pin), pooled[idx])
+            if melspec_proxy is not None and melspec_weight:  # full-mel reconstruction vs the source mel
+                loss = loss + melspec_weight * F.l1_loss(melspec_proxy(pin), mb[:, 0])
             loss.backward()
             opt.step()
-        v = cosine_on(report_idx, temp_final)
-        if v > best:
-            best, best_state = v, copy.deepcopy(encoder.state_dict())
+        cos, ms = evaluate(report_idx, temp_final)
+        obj = -ms if use_ms else cos
+        if obj > best_obj:
+            best_obj, best_state = obj, copy.deepcopy(encoder.state_dict())
         if ep % max(1, epochs // 10) == 0 or ep == epochs:
-            print(f"epoch {ep:>3}: {label} cosine {v:.4f}  (ew={ew:.2f} pc={pw_cont:.2f} pk={pw_cat:.2f} sp={spectral_weight:.2f})")
+            print(f"epoch {ep:>3}: cosine {cos:.4f}" + (f" melspec_l1 {ms:.4f}" if use_ms else "")
+                  + f"  (ew={ew:.2f} pc={pw_cont:.2f} pk={pw_cat:.2f} sp={spectral_weight:.2f} ms={melspec_weight:.2f})")
     encoder.load_state_dict(best_state)  # restore the best epoch, not the last
-    return best
+    return -best_obj if use_ms else best_obj
 
 
 def _smoke(args) -> None:
@@ -204,8 +222,11 @@ def main() -> None:
                     help="categorical (discrete CE + boolean BCE) loss weight; stays on across the schedule "
                          "(default: same as --aux-weight). Unlike --aux-weight it does NOT decay under switch")
     ap.add_argument("--embed-warmup", type=float, default=0.33, help="fraction of training to ramp embedding loss 0->1")
-    ap.add_argument("--mel-proxy", type=Path, help="optional spectral proxy (training.mel_proxy_train) for a pooled log-mel L1 term")
-    ap.add_argument("--spectral-weight", type=float, default=0.0, help="weight of the spectral (pooled log-mel) L1 loss; 0 = off")
+    ap.add_argument("--mel-proxy", type=Path, help="optional pooled-mel proxy (mel_proxy_train --target pooled) for a [N_MELS] envelope L1 term")
+    ap.add_argument("--spectral-weight", type=float, default=0.0, help="weight of the pooled-mel envelope L1 loss; 0 = off")
+    ap.add_argument("--melspec-proxy", type=Path, help="full-mel proxy (mel_proxy_train --target full) for the spectral-RECONSTRUCTION loss vs the source mel")
+    ap.add_argument("--melspec-weight", type=float, default=0.0, help="weight of the full-mel reconstruction L1 (the 'sound like the source' objective); 0 = off")
+    ap.add_argument("--clap-weight", type=float, default=1.0, help="scale on the CLAP-embedding cosine term (0 = disable CLAP)")
     ap.add_argument("--device", default=None)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--smoke", action="store_true", help="fit random mels through a frozen random proxy")
@@ -226,6 +247,7 @@ def main() -> None:
         encoder.load_state_dict(torch.load(args.init, map_location="cpu"))
         print(f"warm-started from {args.init}")
     mel_proxy = _load_proxy(args.mel_proxy, device) if args.mel_proxy else None
+    melspec_proxy = _load_proxy(args.melspec_proxy, device) if args.melspec_proxy else None
     best = train(
         encoder, _load_proxy(args.proxy, device), mels, emb, params,
         temp=args.temperature, temp_final=args.temperature_final or args.temperature,
@@ -233,10 +255,12 @@ def main() -> None:
         embed_warmup=args.embed_warmup, epochs=args.epochs, batch=args.batch, lr=args.lr,
         val_frac=args.val_frac, device=device, seed=args.seed, is_eval=is_eval,
         mel_proxy=mel_proxy, spectral_weight=args.spectral_weight,
+        melspec_proxy=melspec_proxy, melspec_weight=args.melspec_weight, clap_weight=args.clap_weight,
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     torch.save(encoder.state_dict(), args.out)  # raw state_dict -> training.export --checkpoint
-    print(f"saved encoder (val cosine {best:.4f}) -> {args.out}")
+    metric = "melspec_l1" if args.melspec_proxy and args.melspec_weight else "val cosine"
+    print(f"saved encoder (best {metric} {best:.4f}) -> {args.out}")
 
 
 if __name__ == "__main__":

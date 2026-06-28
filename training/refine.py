@@ -6,7 +6,7 @@ proxy/encoder error the gradient pipeline couldn't see.
     python -m training.refine --smoke     # no hardware/cma-on-hardware: prove the CMA-ES loop
 
 1. encoder estimate (web/public/models/model.onnx) -> raw params
-2. render on the XD, record, score log-mel-L1 vs target (eval.metrics, the encoder's space)
+2. render on the XD, record, score audio_distance (onset-aligned, peak-normed log-mel-L1) vs target
 3. if that exceeds --threshold, CMA-ES over the *continuous* params only (the smooth ones:
    cutoff, EG times, levels…), holding the discrete heads (waves/filter type) fixed — those
    are categorical and the encoder picks them outright. Each candidate is a hardware render.
@@ -26,15 +26,75 @@ from pathlib import Path
 
 import numpy as np
 
-from training import korg, schema, xd_params
+from training import audio_distance, korg, schema, xd_params
 from training.eval import infer, metrics
 from training.xd_interface import XdInterface
 
 CONTINUOUS = schema.CONTINUOUS
 
+# Categorical params that set a sound's *character*; the encoder is weak on these (~25% acc)
+# and continuous CMA-ES holds them fixed, so they're the obvious thing to search directly on
+# the XD. All small cardinality (waves 3, octaves 4, multi_type 3, drive/EG-target 3) — cheap
+# to coordinate-search. Excludes voice_mode (forced POLY) and the pitch `octave`.
+DEFAULT_DISC_GROUPS = "vco1_wave,vco1_octave,vco2_wave,vco2_octave,multi_type,filter_drive,eg_target"
+
 
 def to_continuous_unit(raw: dict[str, int]) -> np.ndarray:
     return np.array([raw[p["id"]] / p["raw_max"] for p in CONTINUOUS], dtype=np.float64)
+
+
+def detect_pitch_midi(audio: np.ndarray, sr: int, *, default: int = 60) -> int:
+    """Median voiced f0 of the target -> nearest MIDI note, so we render the candidate at the
+    SOURCE's pitch (matching is timbre; pitch is the played note). Fixed-pitch rendering was
+    grading off-pitch renders — mel_l1 is nearly pitch-blind, so it never noticed."""
+    import librosa
+
+    f, voiced, _ = librosa.pyin(audio, fmin=32.7, fmax=1046.5, sr=sr, frame_length=2048)
+    f = f[voiced & ~np.isnan(f)]
+    if not len(f):
+        return default
+    midi = int(round(69 + 12 * np.log2(float(np.median(f)) / 440.0)))
+    return max(12, min(108, midi))
+
+
+def _disc_offsets() -> dict[str, tuple[int, int]]:
+    """group id -> (start offset, cardinality) into the flat discrete-logit vector."""
+    offs, o = {}, 0
+    for p in schema.DISCRETE:
+        offs[p["id"]] = (o, p["cardinality"])
+        o += p["cardinality"]
+    return offs
+
+
+def discrete_screen(base_raw, disc_logits, render, score, *, groups, topk, passes):
+    """Coordinate-descent over categorical (osc/filter/EG) params on the real XD, with the
+    continuous params held at the encoder estimate. Each candidate value is one hardware
+    render; we only try the encoder's top-k logits per group (a decent prior over which
+    waves/types are plausible). One pass = sum of (≤topk) candidates over the groups; stops
+    early when a full pass makes no change. Returns (best raw patch, its distance)."""
+    offs = _disc_offsets()
+    cur = dict(base_raw)
+    cur_d = score(render(cur))
+    for _ in range(passes):
+        changed = False
+        for gid in groups:
+            if gid not in offs:
+                continue
+            o, card = offs[gid]
+            order = [int(i) for i in np.argsort(disc_logits[o : o + card])[::-1][:topk]]
+            before = keep = cur[gid]
+            for idx in order:
+                if idx == before:
+                    continue
+                cur[gid] = idx
+                d = score(render(cur))
+                if d < cur_d:
+                    cur_d, keep = d, idx
+            cur[gid] = keep
+            changed = changed or keep != before
+        if not changed:
+            break
+    return cur, cur_d
 
 
 def apply_continuous(base_raw: dict[str, int], x) -> dict[str, int]:
@@ -63,17 +123,33 @@ def _accumulate(out: Path, raw: dict[str, int], audio: np.ndarray, sr: int) -> N
         f.write(json.dumps({"id": idx, "source": "refine", **xd_params.targets_for(raw)}) + "\n")
 
 
-def refine(target, session, template, render, *, threshold, evals, sigma, seed):
+def refine(target, session, template, render, *, threshold, evals, sigma, seed,
+           search_discrete=False, disc_groups=(), disc_topk=4, disc_passes=2, lowpass=None):
     """render(raw) -> recorded audio. Returns (best_raw, best_distance, best_audio)."""
-    base_raw = infer.decode_raw(*infer.run_model(session, target))
+    cont_o, disc_o, boo_o = infer.run_model(session, target)
+    base_raw = infer.decode_raw(cont_o, disc_o, boo_o)
+
+    tgt = metrics.lowpass(target, lowpass) if lowpass else target
 
     def score(audio) -> float:
-        return metrics.compare(target, audio)["mel_l1"]
+        return audio_distance.distance(tgt, metrics.lowpass(audio, lowpass) if lowpass else audio)
 
     best_audio = render(base_raw)
     best_d = score(best_audio)
     best_raw = base_raw
-    print(f"encoder estimate: mel_l1={best_d:.4f}")
+    print(f"encoder estimate: dist={best_d:.4f}")
+
+    if search_discrete and disc_groups:
+        screened, sd = discrete_screen(
+            base_raw, disc_o, render, score,
+            groups=disc_groups, topk=disc_topk, passes=disc_passes,
+        )
+        changes = {g: (base_raw[g], screened[g]) for g in disc_groups if screened.get(g) != base_raw.get(g)}
+        print(f"discrete screen: dist {best_d:.4f} -> {sd:.4f}  changed={changes}")
+        base_raw = screened  # continuous CMA-ES starts from the better discrete
+        if sd < best_d:
+            best_d, best_raw, best_audio = sd, screened, render(screened)
+
     if best_d <= threshold:
         print("within threshold — skipping CMA-ES")
         return best_raw, best_d, best_audio
@@ -98,8 +174,8 @@ def refine(target, session, template, render, *, threshold, evals, sigma, seed):
             if d < best_d:
                 best_d, best_raw, best_audio = d, raw, audio
         es.tell(candidates, losses)
-        print(f"  evals {done}: best mel_l1={best_d:.4f}")
-    print(f"CMA-ES refined mel_l1 {score(render(base_raw)):.4f} -> {best_d:.4f}")
+        print(f"  evals {done}: best dist={best_d:.4f}")
+    print(f"CMA-ES refined dist {score(render(base_raw)):.4f} -> {best_d:.4f}")
     return best_raw, best_d, best_audio
 
 
@@ -128,13 +204,22 @@ def main() -> None:
     ap.add_argument("--model", type=Path, default=infer.DEFAULT_MODEL)
     ap.add_argument("--template", type=Path, default=infer.DEFAULT_TEMPLATE)
     ap.add_argument("--pitch", type=int, default=60, help="MIDI note to render the candidate patch")
+    ap.add_argument("--detect-pitch", action="store_true",
+                    help="render at the source's detected pitch (pyin) instead of --pitch")
     ap.add_argument("--gate", type=float, default=1.0)
     ap.add_argument("--duration", type=float, default=2.0)
     ap.add_argument("--settle", type=float, default=0.1)
-    ap.add_argument("--threshold", type=float, default=0.0, help="skip CMA-ES if estimate mel_l1 <= this (0 = always refine)")
+    ap.add_argument("--threshold", type=float, default=0.0, help="skip CMA-ES if estimate distance <= this (0 = always refine)")
     ap.add_argument("--evals", type=int, default=140, help="CMA-ES objective calls (hardware renders)")
     ap.add_argument("--sigma", type=float, default=0.1, help="CMA-ES initial step (neighborhood width in [0,1])")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--search-discrete", action="store_true",
+                    help="coordinate-search osc/filter/EG categorical params on the XD before continuous CMA-ES")
+    ap.add_argument("--disc-groups", default=DEFAULT_DISC_GROUPS, help="comma-separated discrete group ids to search")
+    ap.add_argument("--disc-topk", type=int, default=4, help="encoder top-k logit candidates per discrete group")
+    ap.add_argument("--disc-passes", type=int, default=2, help="coordinate-descent passes over the discrete groups")
+    ap.add_argument("--lowpass", type=float, default=None,
+                    help="band-limit both signals before scoring (e.g. 8000 for 16 kHz NSynth targets)")
     ap.add_argument("--accumulate", type=Path, default=None, help="dir to stash (params, audio) for proxy improvement")
     ap.add_argument("--midi-out", default="minilogue xd SOUND")
     ap.add_argument("--midi-in", default="minilogue xd KBD/KNOB")
@@ -152,18 +237,24 @@ def main() -> None:
     session = infer.load_session(args.model)
     template = korg.extract_prog_bins(args.template)[0]
     target = infer.load_audio(args.target)
+    pitch = detect_pitch_midi(target, sr) if args.detect_pitch else args.pitch
+    if args.detect_pitch:
+        print(f"detected source pitch -> MIDI {pitch}")
     xd = XdInterface(midi_port=args.midi_out, midi_in=args.midi_in, audio_device=args.audio, sample_rate=sr)
     try:
         def render(raw: dict[str, int]) -> np.ndarray:
             xd.send_patch(xd_params.write_params(template, raw), settle_s=args.settle)
-            return xd.record(note=args.pitch, gate_s=args.gate, duration_s=args.duration)
+            return xd.record(note=pitch, gate_s=args.gate, duration_s=args.duration)
 
         best_raw, best_d, best_audio = refine(
             target, session, template, render,
             threshold=args.threshold, evals=args.evals, sigma=args.sigma, seed=args.seed,
+            search_discrete=args.search_discrete,
+            disc_groups=tuple(g.strip() for g in args.disc_groups.split(",") if g.strip()),
+            disc_topk=args.disc_topk, disc_passes=args.disc_passes, lowpass=args.lowpass,
         )
         korg.write_mnlgxdprog(args.template, xd_params.write_params(template, best_raw), args.out)
-        print(f"wrote {args.out} (mel_l1={best_d:.4f})")
+        print(f"wrote {args.out} (dist={best_d:.4f})")
         if args.accumulate:
             _accumulate(args.accumulate, best_raw, best_audio, sr)
             print(f"stashed refined sample -> {args.accumulate}")
