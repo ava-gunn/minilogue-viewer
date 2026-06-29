@@ -6,7 +6,7 @@ proxy/encoder error the gradient pipeline couldn't see.
     python -m training.refine --smoke     # no hardware/cma-on-hardware: prove the CMA-ES loop
 
 1. encoder estimate (web/public/models/model.onnx) -> raw params
-2. render on the XD, record, score audio_distance (onset-aligned, peak-normed log-mel-L1) vs target
+2. render on the XD, record, score multi-scale STFT-L1 (RMS-normalized) vs target
 3. if that exceeds --threshold, CMA-ES over the *continuous* params only (the smooth ones:
    cutoff, EG times, levels…), holding the discrete heads (waves/filter type) fixed — those
    are categorical and the encoder picks them outright. Each candidate is a hardware render.
@@ -26,7 +26,7 @@ from pathlib import Path
 
 import numpy as np
 
-from training import audio_distance, korg, schema, xd_params
+from training import korg, schema, xd_params
 from training.eval import infer, metrics
 from training.xd_interface import XdInterface
 
@@ -142,10 +142,15 @@ def refine(target, session, template, render, *, threshold, evals, sigma, seed,
         base_raw["vco1_octave"] = base_raw["vco2_octave"] = NEUTRAL_VCO_OCTAVE
         disc_groups = tuple(g for g in disc_groups if g not in _OCTAVE_GROUPS)
 
-    tgt = metrics.lowpass(target, lowpass) if lowpass else target
+    tgt = metrics.rms_normalize(metrics.fit(target))
+    if lowpass:
+        tgt = metrics.lowpass(tgt, lowpass)
 
-    def score(audio) -> float:
-        return audio_distance.distance(tgt, metrics.lowpass(audio, lowpass) if lowpass else audio)
+    def score(audio) -> float:  # multi-scale STFT-L1: best ear agreement in the Phase-0 bake-off
+        cand = metrics.rms_normalize(metrics.fit(audio))
+        if lowpass:
+            cand = metrics.lowpass(cand, lowpass)
+        return metrics.multiscale_stft_l1(tgt, cand)
 
     best_audio = render(base_raw)
     best_d = score(best_audio)
