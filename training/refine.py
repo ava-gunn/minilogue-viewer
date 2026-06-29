@@ -38,6 +38,14 @@ CONTINUOUS = schema.CONTINUOUS
 # to coordinate-search. Excludes voice_mode (forced POLY) and the pitch `octave`.
 DEFAULT_DISC_GROUPS = "vco1_wave,vco1_octave,vco2_wave,vco2_octave,multi_type,filter_drive,eg_target"
 
+# VCO octave index that makes a played note sound at its nominal pitch (8' footing).
+# Calibrated on the XD: index 0=16'(-1 oct), 1=8'(0), 2=4'(+1 oct). The encoder's octave guess
+# is unreliable (it put a bass an octave low); when we render at the target's own pitch the
+# correct footing is fixed, so anchor it instead of trusting/searching it. (voice.octave has no
+# effect on received MIDI notes, so it's left alone.)
+NEUTRAL_VCO_OCTAVE = 1
+_OCTAVE_GROUPS = ("vco1_octave", "vco2_octave", "octave")
+
 
 def to_continuous_unit(raw: dict[str, int]) -> np.ndarray:
     return np.array([raw[p["id"]] / p["raw_max"] for p in CONTINUOUS], dtype=np.float64)
@@ -124,10 +132,15 @@ def _accumulate(out: Path, raw: dict[str, int], audio: np.ndarray, sr: int) -> N
 
 
 def refine(target, session, template, render, *, threshold, evals, sigma, seed,
-           search_discrete=False, disc_groups=(), disc_topk=4, disc_passes=2, lowpass=None):
+           search_discrete=False, disc_groups=(), disc_topk=4, disc_passes=2, lowpass=None,
+           anchor_octave=True):
     """render(raw) -> recorded audio. Returns (best_raw, best_distance, best_audio)."""
     cont_o, disc_o, boo_o = infer.run_model(session, target)
     base_raw = infer.decode_raw(cont_o, disc_o, boo_o)
+
+    if anchor_octave:  # render at the played note's nominal pitch; don't trust/search the octave
+        base_raw["vco1_octave"] = base_raw["vco2_octave"] = NEUTRAL_VCO_OCTAVE
+        disc_groups = tuple(g for g in disc_groups if g not in _OCTAVE_GROUPS)
 
     tgt = metrics.lowpass(target, lowpass) if lowpass else target
 
@@ -220,6 +233,8 @@ def main() -> None:
     ap.add_argument("--disc-passes", type=int, default=2, help="coordinate-descent passes over the discrete groups")
     ap.add_argument("--lowpass", type=float, default=None,
                     help="band-limit both signals before scoring (e.g. 8000 for 16 kHz NSynth targets)")
+    ap.add_argument("--anchor-octave", action=argparse.BooleanOptionalAction, default=True,
+                    help="force VCO octave to 8' (note sounds at its played pitch) instead of trusting the encoder")
     ap.add_argument("--accumulate", type=Path, default=None, help="dir to stash (params, audio) for proxy improvement")
     ap.add_argument("--midi-out", default="minilogue xd SOUND")
     ap.add_argument("--midi-in", default="minilogue xd KBD/KNOB")
@@ -252,6 +267,7 @@ def main() -> None:
             search_discrete=args.search_discrete,
             disc_groups=tuple(g.strip() for g in args.disc_groups.split(",") if g.strip()),
             disc_topk=args.disc_topk, disc_passes=args.disc_passes, lowpass=args.lowpass,
+            anchor_octave=args.anchor_octave,
         )
         korg.write_mnlgxdprog(args.template, xd_params.write_params(template, best_raw), args.out)
         print(f"wrote {args.out} (dist={best_d:.4f})")
