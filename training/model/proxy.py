@@ -146,6 +146,83 @@ class MelSpecProxy(nn.Module):
         return mel[:, 0, : schema.N_MELS, : schema.N_FRAMES]
 
 
+class _ParamTower(nn.Module):
+    """Per-parameter token encoder shared by the two-headed proxy: continuous/boolean tokens are
+    a learnable vector scaled by the value; discrete is a soft lookup over learnable category
+    embeddings (so the Stage-3 soft one-hot stays differentiable); a CLS token's output is the
+    context. (Combes et al. 2025 — a transformer over per-param tokens models interdependencies.)"""
+
+    def __init__(
+        self, d_token: int = 192, layers: int = 4, heads: int = 6,
+        ff: int | None = None, dropout: float = 0.1,
+    ) -> None:
+        super().__init__()
+        nc, td, nb = schema.N_CONTINUOUS, schema.TOTAL_DISCRETE, schema.N_BOOLEAN
+        self._disc_slices: list[tuple[int, int]] = []
+        off = 0
+        for card in schema.DISCRETE_CARDINALITIES:
+            self._disc_slices.append((off, off + card))
+            off += card
+        self.cont_w = nn.Parameter(torch.randn(nc, d_token) * 0.02)
+        self.cont_b = nn.Parameter(torch.zeros(nc, d_token))
+        self.disc_w = nn.Parameter(torch.randn(td, d_token) * 0.02)
+        self.bool_w = nn.Parameter(torch.randn(nb, d_token) * 0.02)
+        self.bool_b = nn.Parameter(torch.zeros(nb, d_token))
+        n_tokens = nc + len(self._disc_slices) + nb
+        self.cls = nn.Parameter(torch.zeros(1, 1, d_token))
+        self.pos = nn.Parameter(torch.randn(1, n_tokens + 1, d_token) * 0.02)
+        layer = nn.TransformerEncoderLayer(
+            d_token, heads, ff or 4 * d_token, dropout=dropout,
+            activation="gelu", batch_first=True, norm_first=True,
+        )
+        self.encoder = nn.TransformerEncoder(layer, layers)
+
+    def forward(self, params: torch.Tensor) -> torch.Tensor:
+        cont, disc, boolean = _split(params)
+        cont_tok = cont.unsqueeze(-1) * self.cont_w + self.cont_b
+        bool_tok = boolean.unsqueeze(-1) * self.bool_w + self.bool_b
+        disc_tok = torch.stack([disc[:, a:b] @ self.disc_w[a:b] for a, b in self._disc_slices], dim=1)
+        tokens = torch.cat([cont_tok, disc_tok, bool_tok], dim=1)
+        x = torch.cat([self.cls.expand(tokens.size(0), -1, -1), tokens], dim=1) + self.pos
+        return self.encoder(x)[:, 0]
+
+
+class MelClapProxy(nn.Module):
+    """Two-headed params -> (full log-mel [N_MELS, N_FRAMES], CLAP embedding [512]): the
+    differentiable stand-in for "render on the XD -> (mel, CLAP)" for the Stage-3 reconstruction
+    objective. A shared _ParamTower context feeds a transposed-conv mel decoder (structural
+    detail, the encoder's own input space) and a linear CLAP head (perceptual timbre, the
+    embedding loss validated by Combes et al. 2025). forward returns a dict so both heads are
+    named; trained by training.mel_proxy_train --target full+clap."""
+
+    def __init__(
+        self, embed_dim: int = EMBED_DIM, d_token: int = 192, layers: int = 4, heads: int = 6,
+        ff: int | None = None, dropout: float = 0.1, dec_ch: int = 64, normalize: bool = True,
+    ) -> None:
+        super().__init__()
+        self.normalize = normalize
+        self.tower = _ParamTower(d_token, layers, heads, ff, dropout)
+        self.clap_head = nn.Linear(d_token, embed_dim)
+        self._dec_ch = dec_ch
+        self._h0, self._w0 = schema.N_MELS // 8, -(-schema.N_FRAMES // 8)  # ceil-div on frames
+        self.proj = nn.Linear(d_token, dec_ch * self._h0 * self._w0)
+        self.dec = nn.Sequential(
+            nn.ConvTranspose2d(dec_ch, dec_ch, 4, 2, 1), nn.GELU(),
+            nn.ConvTranspose2d(dec_ch, dec_ch // 2, 4, 2, 1), nn.GELU(),
+            nn.ConvTranspose2d(dec_ch // 2, dec_ch // 4, 4, 2, 1), nn.GELU(),
+            nn.Conv2d(dec_ch // 4, 1, 3, 1, 1),
+        )
+
+    def forward(self, params: torch.Tensor) -> dict[str, torch.Tensor]:
+        ctx = self.tower(params)
+        clap = self.clap_head(ctx)
+        if self.normalize:
+            clap = torch.nn.functional.normalize(clap, dim=-1)
+        g = self.proj(ctx).view(-1, self._dec_ch, self._h0, self._w0)
+        mel = self.dec(g)[:, 0, : schema.N_MELS, : schema.N_FRAMES]  # [B, N_MELS, N_FRAMES]
+        return {"mel": mel, "clap": clap}
+
+
 def build_proxy(arch: str = "mlp", embed_dim: int = EMBED_DIM, normalize: bool = True, **cfg) -> nn.Module:
     """Construct a proxy by name. cfg keys: mlp -> hidden, depth; transformer -> d_token,
     layers, heads. normalize=False gives a raw (non-unit) output for a spectral/log-mel target.
@@ -161,5 +238,10 @@ def build_proxy(arch: str = "mlp", embed_dim: int = EMBED_DIM, normalize: bool =
         return MelSpecProxy(
             d_token=cfg.get("d_token", 192), layers=cfg.get("layers", 4),
             heads=cfg.get("heads", 6), dec_ch=cfg.get("dec_ch", 64),
+        )
+    if arch == "melclap":  # two-headed params -> {"mel": [N_MELS, N_FRAMES], "clap": [embed_dim]}
+        return MelClapProxy(
+            embed_dim, d_token=cfg.get("d_token", 192), layers=cfg.get("layers", 4),
+            heads=cfg.get("heads", 6), dec_ch=cfg.get("dec_ch", 64), normalize=normalize,
         )
     raise ValueError(f"unknown proxy arch {arch!r}")
