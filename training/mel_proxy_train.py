@@ -209,7 +209,10 @@ def main() -> None:
     ap.add_argument("--d-token", type=int, default=192)
     ap.add_argument("--layers", type=int, default=4)
     ap.add_argument("--heads", type=int, default=6)
-    ap.add_argument("--dec-ch", type=int, default=64, help="melspec decoder base channels")
+    ap.add_argument("--dec-ch", type=int, default=64, help="melspec/conv decoder base channels")
+    ap.add_argument("--mel-decoder", choices=["conv", "temporal"], default="temporal",
+                    help="full+clap mel head: temporal (per-frame self-attention, default) or conv (transposed-conv)")
+    ap.add_argument("--dec-layers", type=int, default=2, help="temporal mel-decoder transformer layers")
     ap.add_argument("--hidden", type=int, default=512, help="pooled mlp only")
     ap.add_argument("--depth", type=int, default=4, help="pooled mlp only")
     ap.add_argument("--device", default=None)
@@ -233,7 +236,8 @@ def main() -> None:
             y = full_mel(mels) if args.target == "full" else pooled_mel(mels)
 
     if args.target == "full+clap":
-        cfg = {"d_token": args.d_token, "layers": args.layers, "heads": args.heads, "dec_ch": args.dec_ch}
+        cfg = {"d_token": args.d_token, "layers": args.layers, "heads": args.heads, "dec_ch": args.dec_ch,
+               "mel_decoder": args.mel_decoder, "dec_layers": args.dec_layers}
         model = proxy_model.build_proxy("melclap", embed_dim=proxy_model.EMBED_DIM, normalize=True, **cfg)
     elif args.target == "full":
         cfg = {"d_token": args.d_token, "layers": args.layers, "heads": args.heads, "dec_ch": args.dec_ch}

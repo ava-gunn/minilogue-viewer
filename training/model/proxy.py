@@ -190,36 +190,54 @@ class _ParamTower(nn.Module):
 class MelClapProxy(nn.Module):
     """Two-headed params -> (full log-mel [N_MELS, N_FRAMES], CLAP embedding [512]): the
     differentiable stand-in for "render on the XD -> (mel, CLAP)" for the Stage-3 reconstruction
-    objective. A shared _ParamTower context feeds a transposed-conv mel decoder (structural
-    detail, the encoder's own input space) and a linear CLAP head (perceptual timbre, the
-    embedding loss validated by Combes et al. 2025). forward returns a dict so both heads are
-    named; trained by training.mel_proxy_train --target full+clap."""
+    objective. A shared _ParamTower context feeds a mel decoder (mel_decoder="conv" transposed-
+    conv, or "temporal" per-frame self-attention — better at time-varying detail) and a linear
+    CLAP head (perceptual timbre, the embedding loss validated by Combes et al. 2025). forward
+    returns a dict so both heads are named; trained by training.mel_proxy_train --target full+clap."""
 
     def __init__(
         self, embed_dim: int = EMBED_DIM, d_token: int = 192, layers: int = 4, heads: int = 6,
         ff: int | None = None, dropout: float = 0.1, dec_ch: int = 64, normalize: bool = True,
+        mel_decoder: str = "conv", dec_layers: int = 2,
     ) -> None:
         super().__init__()
         self.normalize = normalize
+        self.mel_decoder = mel_decoder
         self.tower = _ParamTower(d_token, layers, heads, ff, dropout)
         self.clap_head = nn.Linear(d_token, embed_dim)
-        self._dec_ch = dec_ch
-        self._h0, self._w0 = schema.N_MELS // 8, -(-schema.N_FRAMES // 8)  # ceil-div on frames
-        self.proj = nn.Linear(d_token, dec_ch * self._h0 * self._w0)
-        self.dec = nn.Sequential(
-            nn.ConvTranspose2d(dec_ch, dec_ch, 4, 2, 1), nn.GELU(),
-            nn.ConvTranspose2d(dec_ch, dec_ch // 2, 4, 2, 1), nn.GELU(),
-            nn.ConvTranspose2d(dec_ch // 2, dec_ch // 4, 4, 2, 1), nn.GELU(),
-            nn.Conv2d(dec_ch // 4, 1, 3, 1, 1),
-        )
+        if mel_decoder == "temporal":
+            # one param-conditioned token per output frame + temporal self-attention, so the
+            # decoder can place time-localized detail (envelopes/sweeps) instead of smearing it.
+            self.time_query = nn.Parameter(torch.randn(1, schema.N_FRAMES, d_token) * 0.02)
+            self.ctx_proj = nn.Linear(d_token, d_token)
+            tlayer = nn.TransformerEncoderLayer(
+                d_token, heads, ff or 4 * d_token, dropout=dropout,
+                activation="gelu", batch_first=True, norm_first=True,
+            )
+            self.tdec = nn.TransformerEncoder(tlayer, dec_layers)
+            self.frame_head = nn.Linear(d_token, schema.N_MELS)
+        else:  # "conv": transposed-conv decoder upsampling a seed grid from the single context
+            self._dec_ch = dec_ch
+            self._h0, self._w0 = schema.N_MELS // 8, -(-schema.N_FRAMES // 8)  # ceil-div on frames
+            self.proj = nn.Linear(d_token, dec_ch * self._h0 * self._w0)
+            self.dec = nn.Sequential(
+                nn.ConvTranspose2d(dec_ch, dec_ch, 4, 2, 1), nn.GELU(),
+                nn.ConvTranspose2d(dec_ch, dec_ch // 2, 4, 2, 1), nn.GELU(),
+                nn.ConvTranspose2d(dec_ch // 2, dec_ch // 4, 4, 2, 1), nn.GELU(),
+                nn.Conv2d(dec_ch // 4, 1, 3, 1, 1),
+            )
 
     def forward(self, params: torch.Tensor) -> dict[str, torch.Tensor]:
         ctx = self.tower(params)
         clap = self.clap_head(ctx)
         if self.normalize:
             clap = torch.nn.functional.normalize(clap, dim=-1)
-        g = self.proj(ctx).view(-1, self._dec_ch, self._h0, self._w0)
-        mel = self.dec(g)[:, 0, : schema.N_MELS, : schema.N_FRAMES]  # [B, N_MELS, N_FRAMES]
+        if self.mel_decoder == "temporal":
+            seq = self.time_query + self.ctx_proj(ctx).unsqueeze(1)  # [B, N_FRAMES, d_token]
+            mel = self.frame_head(self.tdec(seq)).transpose(1, 2)    # [B, N_MELS, N_FRAMES]
+        else:
+            g = self.proj(ctx).view(-1, self._dec_ch, self._h0, self._w0)
+            mel = self.dec(g)[:, 0, : schema.N_MELS, : schema.N_FRAMES]  # [B, N_MELS, N_FRAMES]
         return {"mel": mel, "clap": clap}
 
 
@@ -243,5 +261,6 @@ def build_proxy(arch: str = "mlp", embed_dim: int = EMBED_DIM, normalize: bool =
         return MelClapProxy(
             embed_dim, d_token=cfg.get("d_token", 192), layers=cfg.get("layers", 4),
             heads=cfg.get("heads", 6), dec_ch=cfg.get("dec_ch", 64), normalize=normalize,
+            mel_decoder=cfg.get("mel_decoder", "conv"), dec_layers=cfg.get("dec_layers", 2),
         )
     raise ValueError(f"unknown proxy arch {arch!r}")
