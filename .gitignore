@@ -44,3 +44,6 @@ training/.nightly.lock
 /_local/
 .vercel
 .env*
+
+# A/B listening-test run outputs (generated)
+tools/abtest/results/
