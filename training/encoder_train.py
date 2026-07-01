@@ -83,18 +83,65 @@ def _heads(proxy: torch.nn.Module, pin: torch.Tensor):
     return (out["clap"], out["mel"]) if isinstance(out, dict) else (out, None)
 
 
-def _param_loss(cont, disc_logits, boolean, true_cont, true_disc, true_bool):
+def _disc_class_weights(true_disc, tr_idx, device, cap=10.0):
+    """Per-group inverse-frequency class weights (sklearn 'balanced': N/(card*count)), capped to
+    bound ultra-rare classes; absent classes -> 0 (never indexed by the CE). Counteracts the
+    preset-finetune imbalance that pushed the categorical heads toward their majority class."""
+    ws = []
+    for g, card in enumerate(schema.DISCRETE_CARDINALITIES):
+        counts = torch.bincount(true_disc[tr_idx, g].cpu(), minlength=card).float()
+        w = counts.sum() / (card * counts.clamp(min=1.0))
+        w[counts == 0] = 0.0
+        ws.append(w.clamp(max=cap).to(device))
+    return ws
+
+
+def _param_loss(cont, disc_logits, boolean, true_cont, true_disc, true_bool, disc_weights=None):
     """Supervised parameter loss (Combes et al.), split by type for separate scheduling:
     returns (continuous_l1, categorical_loss), where categorical = mean per-group cross-entropy
     on discrete logits + BCE on boolean. Both come from the Sobol sweep's exact ground-truth
-    params; the split lets the continuous term decay while the categorical term persists."""
+    params; the split lets the continuous term decay while the categorical term persists.
+    disc_weights (optional) = per-group class weights for the discrete CE (see _disc_class_weights)."""
     ce = disc_logits.new_zeros(())
     off = 0
     for g, card in enumerate(schema.DISCRETE_CARDINALITIES):
-        ce = ce + F.cross_entropy(disc_logits[:, off : off + card], true_disc[:, g])
+        w = None if disc_weights is None else disc_weights[g]
+        ce = ce + F.cross_entropy(disc_logits[:, off : off + card], true_disc[:, g], weight=w)
         off += card
     ce = ce / len(schema.DISCRETE_CARDINALITIES)
     return F.l1_loss(cont, true_cont), ce + F.binary_cross_entropy(boolean, true_bool)
+
+
+def _augment_mel(mb: torch.Tensor, gen: torch.Generator, cfg: dict) -> torch.Tensor:
+    """Train-only mel-domain augmentation for real-input robustness. The sweep+presets are all
+    clean, single-level XD renders; real target clips vary in level, noise floor and spectral
+    coloration. Operates on log-mel [B, N_MELS, N_FRAMES] AFTER mel compute, so the browser
+    parity path (mel.ts <-> mel.py) is untouched. gain = per-sample log-power level offset;
+    tilt = per-sample linear spectral slope (EQ coloration); noise = additive noise floor at a
+    fraction of the sample's median power; fmask/tmask = SpecAugment bands masked to the floor
+    (random width in [0, w], so a width of 0 = no mask, giving per-sample stochastic masking)."""
+    b, m, f = mb.shape
+    rand = lambda *s: torch.rand(*s, generator=gen)
+    if cfg["gain"]:
+        mb = mb + (rand(b, 1, 1) * 2 - 1) * cfg["gain"]
+    if cfg["tilt"]:
+        ramp = torch.linspace(-1.0, 1.0, m).view(1, m, 1)
+        mb = mb + (rand(b, 1, 1) * 2 - 1) * cfg["tilt"] * ramp
+    if cfg["noise"]:
+        med = mb.exp().median(1, keepdim=True).values.median(2, keepdim=True).values
+        mb = torch.logaddexp(mb, (rand(b, 1, 1) * cfg["noise"] * med).clamp_min(1e-12).log())
+    floor = mb.amin((1, 2), keepdim=True)
+    if cfg["fmask"]:
+        w = torch.randint(0, cfg["fmask"] + 1, (b, 1, 1), generator=gen)
+        s = (rand(b, 1, 1) * (m - w).clamp_min(1)).long()
+        band = (torch.arange(m).view(1, m, 1) >= s) & (torch.arange(m).view(1, m, 1) < s + w)
+        mb = torch.where(band, floor, mb)
+    if cfg["tmask"]:
+        w = torch.randint(0, cfg["tmask"] + 1, (b, 1, 1), generator=gen)
+        s = (rand(b, 1, 1) * (f - w).clamp_min(1)).long()
+        band = (torch.arange(f).view(1, 1, f) >= s) & (torch.arange(f).view(1, 1, f) < s + w)
+        mb = torch.where(band, floor, mb)
+    return mb
 
 
 def train(
@@ -102,6 +149,7 @@ def train(
     temp, temp_final, schedule, aux_weight, disc_weight=None, embed_warmup, epochs, batch, lr,
     val_frac, device, seed, is_eval=None, mel_proxy=None, spectral_weight=0.0,
     melspec_proxy=None, melspec_weight=0.0, clap_weight=1.0, bridge="soft", track="auto",
+    balance_disc=False, balance_cap=10.0, augment=None,
 ) -> float:
     n = len(mels)
     if is_eval is not None and bool(is_eval.any()):  # held-out presets are the val set
@@ -134,9 +182,15 @@ def train(
     for card in schema.DISCRETE_CARDINALITIES:
         slices.append((off, off + card)); off += card
     true_disc = torch.stack([params[:, nc + a : nc + b].argmax(1) for a, b in slices], dim=1)
+    disc_weights = _disc_class_weights(true_disc, tr_idx, device, balance_cap) if balance_disc else None
 
-    def melbatch(idx: list[int]) -> torch.Tensor:
-        return torch.from_numpy(np.asarray(mels[idx])).unsqueeze(1).to(device)
+    aug_gen = torch.Generator().manual_seed(seed + 9973) if augment else None
+
+    def melbatch(idx: list[int], aug: bool = False) -> torch.Tensor:
+        mb = torch.from_numpy(np.asarray(mels[idx]))
+        if aug and augment:
+            mb = _augment_mel(mb, aug_gen, augment)
+        return mb.unsqueeze(1).to(device)
 
     @torch.no_grad()
     def evaluate(idx: list[int], temperature: float) -> tuple[float, float]:
@@ -163,6 +217,8 @@ def train(
           f"aux_cont={aux_weight}, aux_cat={dw}, clap_w={clap_weight}, melspec_w={melspec_weight})")
     best_obj = -ims if track_ms else ic  # maximize either way
     best_state = copy.deepcopy(encoder.state_dict())
+    if augment:
+        print(f"augment (train batches only): {augment}")
     for ep in range(1, epochs + 1):
         prog = (ep - 1) / max(1, epochs - 1)
         t = temp + (temp_final - temp) * prog
@@ -181,7 +237,7 @@ def train(
         for b in order.split(batch):
             idx = [tr_idx[i] for i in b.tolist()]
             opt.zero_grad()
-            mb = melbatch(idx)
+            mb = melbatch(idx, aug=True)
             c, d, bo = encoder(mb)
             pin = proxy_input(c, d, bo, t, bridge)
             clap_pred, mel_pred = _heads(proxy, pin)  # mel_pred is None for a single-head proxy
@@ -189,7 +245,7 @@ def train(
             if clap_weight and ew:
                 loss = loss + clap_weight * ew * cosine_loss(clap_pred, emb[idx])
             if pw_cont or pw_cat:
-                cont_l, cat_l = _param_loss(c, d, bo, true_cont[idx], true_disc[idx], true_bool[idx])
+                cont_l, cat_l = _param_loss(c, d, bo, true_cont[idx], true_disc[idx], true_bool[idx], disc_weights)
                 loss = loss + pw_cont * cont_l + pw_cat * cat_l
             if mel_proxy is not None and spectral_weight:
                 loss = loss + spectral_weight * F.l1_loss(mel_proxy(pin), pooled[idx])
@@ -286,6 +342,16 @@ def main() -> None:
                     help="discrete->proxy bridge: soft one-hot (default); st = straight-through hard one-hot; gumbel = Gumbel-softmax ST")
     ap.add_argument("--device", default=None)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--balance-disc", action="store_true",
+                    help="inverse-frequency class weights on the discrete CE (lifts minority-class recall; counteracts preset imbalance)")
+    ap.add_argument("--balance-cap", type=float, default=10.0, help="max class-weight when --balance-disc")
+    ap.add_argument("--augment", action="store_true",
+                    help="train-only mel-domain augmentation for real-input robustness (level/EQ-tilt/noise-floor/SpecAugment); the sweep+presets are clean single-level XD renders")
+    ap.add_argument("--aug-gain", type=float, default=1.2, help="max |log-power level offset| when --augment")
+    ap.add_argument("--aug-tilt", type=float, default=0.7, help="max linear spectral-tilt slope (EQ) when --augment")
+    ap.add_argument("--aug-noise", type=float, default=0.1, help="max noise floor as a fraction of per-sample median power when --augment")
+    ap.add_argument("--aug-fmask", type=int, default=12, help="max SpecAugment freq-mask width in mel bins when --augment")
+    ap.add_argument("--aug-tmask", type=int, default=12, help="max SpecAugment time-mask width in frames when --augment")
     ap.add_argument("--smoke", action="store_true", help="fit random mels through a frozen random proxy")
     args = ap.parse_args()
 
@@ -315,7 +381,9 @@ def main() -> None:
         val_frac=args.val_frac, device=device, seed=args.seed, is_eval=is_eval,
         mel_proxy=mel_proxy, spectral_weight=args.spectral_weight,
         melspec_proxy=melspec_proxy, melspec_weight=args.melspec_weight, clap_weight=args.clap_weight,
-        bridge=args.bridge,
+        bridge=args.bridge, balance_disc=args.balance_disc, balance_cap=args.balance_cap,
+        augment=dict(gain=args.aug_gain, tilt=args.aug_tilt, noise=args.aug_noise,
+                     fmask=args.aug_fmask, tmask=args.aug_tmask) if args.augment else None,
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     torch.save(encoder.state_dict(), args.out)  # raw state_dict -> training.export --checkpoint
