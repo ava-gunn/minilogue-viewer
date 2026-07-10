@@ -1,57 +1,53 @@
-# Nightly retrain
+# Retrain pipeline (manual)
 
-`nightly-retrain.sh` runs, unattended, at midnight:
+`nightly-retrain.sh` is run **by hand** when you want to fold new submissions into the model.
+It is **not scheduled** — there is no cron or launchd job. (Collecting + clearing submissions is
+likewise manual; see below.)
+
+```sh
+scripts/nightly-retrain.sh; tail -n 40 training/.nightly.log
+```
+
+Steps:
 
 1. **pull** — `training.data.pull_contributions` fetches submissions from the deployed app and clears them from Vercel Blob (skips the rest if nothing new arrived).
 2. **embed** — `training.data.embed` computes CLAP embeddings for the contrib audio.
 3. **gate** — `training.eval.gate_contrib` scores each submission with the trained proxy (params → predicted embedding vs the audio's real embedding, cosine) and keeps those `≥ GATE_THRESHOLD` into `training/data/contrib_accepted/`.
-4. **finetune** — if any passed, `training.encoder_train` warm-starts from the clean base encoder and trains on `SWEEP + contrib_accepted`.
+4. **finetune** — if any passed, `training.encoder_train` warm-starts from the clean base encoder and trains on the full recipe (`SWEEP + presets + presets_new + xd_pitch + contrib_accepted`).
 5. **export** — `training.export` writes `web/public/models/model.onnx` (atomic).
 
 No XD hardware required. Logs to `training/.nightly.log`; a `mkdir` lock (`training/.nightly.lock`) prevents overlapping runs.
 
-## One-time setup
+## Collect + clear submissions only (without retraining)
 
-1. **Env** — create `/Users/ava/Developer/minilogue-viewer/.env.nightly` (gitignored via `.env.*`):
-   ```sh
-   CONTRIB_API_URL=https://minilogue-xd-viewer.vercel.app
-   CONTRIB_ADMIN_TOKEN=<same token set in Vercel>
-   # optional overrides (defaults shown):
-   # SWEEP=/Volumes/Samples/training/xd
-   # RUNS=/Volumes/Samples/training/runs
-   # PROXY=$RUNS/proxy.pt
-   # BASE_ENCODER=$RUNS/encoder.pt
-   # GATE_THRESHOLD=0.5
-   ```
-2. **Prereqs** the preflight checks: the venv at `training/.venv`, the sweep dataset mounted at `$SWEEP`, and `$PROXY` + `$BASE_ENCODER` present.
-3. **Test it once by hand** before scheduling:
-   ```sh
-   scripts/nightly-retrain.sh; tail -n 40 training/.nightly.log
-   ```
-
-## Schedule it — option A: launchd (recommended on macOS)
-
-Survives sleep (runs at next wake if asleep at midnight) and sees user-mounted volumes.
+Collection and clearing are a standalone manual command — run it whenever you want to pull the
+form submissions off Vercel Blob and clear them (or `--no-clear` to keep them on Blob):
 
 ```sh
-cp scripts/com.minilogue.nightly-retrain.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.minilogue.nightly-retrain.plist
-launchctl list | grep minilogue            # confirm it's registered
-# run it now to verify wiring:
-launchctl start com.minilogue.nightly-retrain
-# to remove:
-launchctl unload ~/Library/LaunchAgents/com.minilogue.nightly-retrain.plist
+python -m training.data.pull_contributions            # pull + clear
+python -m training.data.pull_contributions --no-clear # pull, leave on Blob
 ```
 
-## Schedule it — option B: cron
+It writes the local `contrib` split + a `.pulled` ledger and is idempotent (re-deletes any
+ledgered id still present on Blob). Requires `CONTRIB_API_URL` + `CONTRIB_ADMIN_TOKEN` (below).
 
+## Setup
+
+**Env** — create `/Users/ava/Developer/minilogue-viewer/.env.nightly` (gitignored via `.env.*`):
 ```sh
-crontab -e
-# add:
-0 0 * * * /Users/ava/Developer/minilogue-viewer/scripts/nightly-retrain.sh >> /Users/ava/Developer/minilogue-viewer/training/.nightly.cron.log 2>&1
+CONTRIB_API_URL=https://minilogue-xd-viewer.vercel.app
+CONTRIB_ADMIN_TOKEN=<same token set in Vercel>
+# optional overrides (defaults shown):
+# SWEEP=/Volumes/Samples/training/xd
+# RUNS=/Volumes/Samples/training/runs
+# PROXY=$RUNS/proxy.pt
+# BASE_ENCODER=$RUNS/encoder.pt
+# GATE_THRESHOLD=0.5
 ```
+`pull_contributions` also reads `CONTRIB_API_URL` / `CONTRIB_ADMIN_TOKEN` from the environment if
+you run it standalone (outside the pipeline script).
 
-macOS caveats: grant `/usr/sbin/cron` **Full Disk Access** (System Settings ▸ Privacy & Security), cron **won't fire while the Mac is asleep**, and it may not see externally-mounted volumes. Prefer launchd.
+**Prereqs** the preflight checks: the venv at `training/.venv`, the sweep dataset mounted at `$SWEEP`, and `$PROXY` + `$BASE_ENCODER` present.
 
 ## Tuning the gate
 

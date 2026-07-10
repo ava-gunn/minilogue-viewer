@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Nightly, hardware-free: pull contributions -> embed -> proxy-gate -> (if any pass) finetune the
-# encoder from the clean base on sweep + accepted contributions -> export web/public/models/model.onnx.
-# Invoked by cron/launchd at midnight. All paths are absolute (cron runs with a minimal PATH).
-# Install instructions: see scripts/nightly-retrain.README.md.
+# Retrain (hardware-free): pull contributions -> embed -> proxy-gate -> (if any pass) finetune the
+# encoder from the clean base on the full recipe -> export web/public/models/model.onnx.
+# RUN MANUALLY when you want to fold in new submissions — NOT scheduled (no cron/launchd). Paths are
+# absolute so it runs from any cwd. See scripts/nightly-retrain.README.md.
 set -euo pipefail
 
 REPO="/Users/ava/Developer/minilogue-viewer"
