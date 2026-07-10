@@ -133,7 +133,7 @@ def _accumulate(out: Path, raw: dict[str, int], audio: np.ndarray, sr: int) -> N
 
 def refine(target, session, template, render, *, threshold, evals, sigma, seed,
            search_discrete=False, disc_groups=(), disc_topk=4, disc_passes=2, lowpass=None,
-           anchor_octave=True):
+           anchor_octave=True, clap_rerank=False, clap_topk=8):
     """render(raw) -> recorded audio. Returns (best_raw, best_distance, best_audio)."""
     cont_o, disc_o, boo_o = infer.run_model(session, target)
     base_raw = infer.decode_raw(cont_o, disc_o, boo_o)
@@ -155,7 +155,23 @@ def refine(target, session, template, render, *, threshold, evals, sigma, seed,
     best_audio = render(base_raw)
     best_d = score(best_audio)
     best_raw = base_raw
+    pool = [(best_d, best_raw, best_audio)]  # (mss_dist, raw, audio); the CLAP re-ranker's top-K seed
     print(f"encoder estimate: dist={best_d:.4f}")
+
+    def _finalize(b_raw, b_d, b_audio):
+        """Optional CLAP re-rank: among the top-K mss candidates (renders already in hand), let
+        CLAP-cosine pick the perceptually-closest. CMA-ES still optimized cheap mss, so it can't
+        game CLAP; CLAP only breaks ties among mss-good finals. See training/eval/clap_metric.py."""
+        if not clap_rerank or len(pool) < 2:
+            return b_raw, b_d, b_audio
+        from training.eval.clap_metric import ClapScorer
+        top = sorted(pool, key=lambda t: t[0])[:clap_topk]
+        cd = ClapScorer().distances([a for _d, _r, a in top], target)
+        j = int(np.argmin(cd))
+        d_j, raw_j, audio_j = top[j]
+        print(f"CLAP re-rank (top-{len(top)} by mss): mss-best={b_d:.4f} -> picked mss={d_j:.4f} "
+              f"clap={cd[j]:.4f}" + ("  [same as mss-best]" if raw_j is b_raw else "  [DIFFERENT — CLAP override]"))
+        return raw_j, d_j, audio_j
 
     if search_discrete and disc_groups:
         screened, sd = discrete_screen(
@@ -167,10 +183,11 @@ def refine(target, session, template, render, *, threshold, evals, sigma, seed,
         base_raw = screened  # continuous CMA-ES starts from the better discrete
         if sd < best_d:
             best_d, best_raw, best_audio = sd, screened, render(screened)
+            pool.append((sd, screened, best_audio))
 
     if best_d <= threshold:
         print("within threshold — skipping CMA-ES")
-        return best_raw, best_d, best_audio
+        return _finalize(best_raw, best_d, best_audio)
 
     import cma  # the `refine` extra
 
@@ -188,13 +205,14 @@ def refine(target, session, template, render, *, threshold, evals, sigma, seed,
             audio = render(raw)
             d = score(audio)
             losses.append(d)
+            pool.append((d, raw, audio))
             done += 1
             if d < best_d:
                 best_d, best_raw, best_audio = d, raw, audio
         es.tell(candidates, losses)
         print(f"  evals {done}: best dist={best_d:.4f}")
     print(f"CMA-ES refined dist {score(render(base_raw)):.4f} -> {best_d:.4f}")
-    return best_raw, best_d, best_audio
+    return _finalize(best_raw, best_d, best_audio)
 
 
 def _smoke(args) -> None:
@@ -240,6 +258,9 @@ def main() -> None:
                     help="band-limit both signals before scoring (e.g. 8000 for 16 kHz NSynth targets)")
     ap.add_argument("--anchor-octave", action=argparse.BooleanOptionalAction, default=True,
                     help="force VCO octave to 8' (note sounds at its played pitch) instead of trusting the encoder")
+    ap.add_argument("--clap-rerank", action="store_true",
+                    help="re-rank the top-K mss candidates by CLAP-cosine and output the perceptual pick (CLAP validated as a re-ranker, not an inner-loop objective)")
+    ap.add_argument("--clap-topk", type=int, default=8, help="how many top-mss candidates CLAP re-ranks")
     ap.add_argument("--accumulate", type=Path, default=None, help="dir to stash (params, audio) for proxy improvement")
     ap.add_argument("--midi-out", default="minilogue xd SOUND")
     ap.add_argument("--midi-in", default="minilogue xd KBD/KNOB")
@@ -272,7 +293,7 @@ def main() -> None:
             search_discrete=args.search_discrete,
             disc_groups=tuple(g.strip() for g in args.disc_groups.split(",") if g.strip()),
             disc_topk=args.disc_topk, disc_passes=args.disc_passes, lowpass=args.lowpass,
-            anchor_octave=args.anchor_octave,
+            anchor_octave=args.anchor_octave, clap_rerank=args.clap_rerank, clap_topk=args.clap_topk,
         )
         korg.write_mnlgxdprog(args.template, xd_params.write_params(template, best_raw), args.out)
         print(f"wrote {args.out} (dist={best_d:.4f})")
