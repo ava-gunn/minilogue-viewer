@@ -267,20 +267,22 @@ export function initResynth(link: SynthLink): void {
     }
   })
 
-  // 'adjusted' uploads the live hardware program (generated patch + knob tweaks) read back from the XD.
+  // 'adjusted' uploads the synth's live current program — a fresh dump, so every param reflects the
+  // actual hardware: the values you adjusted AND the preset values for everything you didn't touch.
   const submit = async (kind: Rating): Promise<void> => {
     if (!file) return
     let submitRaw = rawById
     if (kind === 'adjusted') {
-      const t = link.getTemplate()
-      if (!t) {
+      if (!link.getTemplate()) {
         toast(
           'Connect your minilogue xd and load the patch first so we can capture your changes.',
           'danger',
         )
         return
       }
-      submitRaw = readRawById(t) // current edit buffer = generated + the user's tweaks
+      const fresh = (await link.requestDump()) ?? link.getTemplate()
+      if (!fresh) return
+      submitRaw = readRawById(fresh) // full current hardware edit buffer, every param
     }
     if (!submitRaw) return
 
