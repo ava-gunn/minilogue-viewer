@@ -67,14 +67,6 @@ describe('index.html — resynth form', () => {
     ).toBe('polite')
   })
 
-  it('the Gemini key is described by its note', () => {
-    const id = doc
-      .querySelector('#gemini-key')
-      ?.getAttribute('aria-describedby')
-    expect(id).toBeTruthy()
-    expect(doc.getElementById(id as string)).not.toBeNull()
-  })
-
   it('every visible form control has an accessible name', () => {
     for (const el of doc.querySelectorAll<HTMLElement>('input, select')) {
       if (el.hasAttribute('hidden')) continue // e.g. the file input, operated via its button

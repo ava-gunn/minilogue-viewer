@@ -36,7 +36,7 @@ export default defineConfig({
   // reach the client; the server/python secrets in that file stay unexposed.
   envDir: resolve(root, '..'),
   // Single page (index.html). The re-synthesis form lives here too but its controller + deps
-  // (ONNX, @google/genai, Turnstile) load as a separate chunk on the first Resynthesis click.
+  // (ONNX, Turnstile) load as a separate chunk on the first Resynthesis click.
   build: {
     // No inline modulepreload polyfill — keeps the prod HTML free of inline scripts so the
     // strict script-src CSP (vercel.json) holds. Safe: Web MIDI already limits this app to

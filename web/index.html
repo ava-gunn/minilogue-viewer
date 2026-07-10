@@ -71,37 +71,7 @@
           </ol>
 
           <section class="resynth-controls">
-            <!-- engine selector + Gemini credentials -->
-            <fieldset class="resynth-engine">
-              <legend>Model</legend>
-              <div class="resynth-engine-row">
-                <label>
-                  <input type="radio" name="resynth-engine" id="engine-builtin" value="builtin" checked />
-                  Built-in model
-                </label>
-                <label>
-                  <input type="radio" name="resynth-engine" id="engine-gemini" value="gemini" />
-                  Gemini
-                </label>
-              </div>
-              <!-- gemini credentials (shown only for the Gemini engine) -->
-              <div id="gemini-creds" class="resynth-creds" hidden>
-                <label class="resynth-field">
-                  <span>Gemini API token</span>
-                  <input id="gemini-key" type="password" autocomplete="off" placeholder="AIza…" aria-describedby="gemini-note" />
-                </label>
-                <label class="resynth-field">
-                  <span>Gemini model</span>
-                  <select id="gemini-model"></select>
-                </label>
-                <p class="resynth-note" id="gemini-note">
-                  Stored only in this browser, sent only to Google. Get a token at
-                  <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">aistudio.google.com/apikey</a>.
-                </p>
-              </div>
-            </fieldset>
-
-            <!-- audio upload (becomes a waveform once loaded)  OR  text description (mutually exclusive) -->
+            <!-- audio upload (becomes a waveform once loaded) -->
             <div class="resynth-input">
               <div class="resynth-audio">
                 <div id="resynth-drop" class="resynth-drop">
@@ -123,12 +93,6 @@
                   <audio id="resynth-audio" preload="metadata"></audio>
                 </div>
               </div>
-              <span id="resynth-or" class="resynth-or" aria-hidden="true">or</span>
-              <label id="resynth-text-wrap" class="resynth-text-wrap">
-                <span class="resynth-text-label">Describe a patch</span>
-                <textarea id="resynth-text" class="resynth-text" rows="3"
-                  placeholder="e.g. warm analog pad, slow attack, long reverb tail, slight detune between oscillators"></textarea>
-              </label>
             </div>
 
             <div class="resynth-actions">

@@ -67,50 +67,6 @@
   font-family: var(--xd-font, system-ui, sans-serif);
 }
 
-.resynth-engine {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  border: 1px solid var(--xd-divider, #44444e);
-  border-radius: 0.5rem;
-  padding: 0.5rem 0.85rem 0.75rem;
-  font-size: 0.85rem;
-  background: var(--xd-group-bg, #18181c);
-}
-.resynth-engine-row {
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-}
-
-.resynth-engine legend {
-  padding: 0 0.35rem;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.7;
-}
-
-.resynth-engine label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  cursor: pointer;
-}
-.resynth-engine label:has(input:disabled) {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.resynth-creds {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 1rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--xd-divider, #44444e);
-}
-
 .resynth-field {
   display: flex;
   flex-direction: column;
@@ -133,23 +89,6 @@
   border: 1px solid var(--xd-divider, #44444e);
   background: var(--wa-color-surface-raised, #1f1f24);
   color: inherit;
-}
-
-.resynth-field input[type="password"] {
-  min-width: 16rem;
-}
-
-.resynth-note {
-  margin: 0;
-  flex: 1 1 12rem;
-  font-size: 0.72rem;
-  line-height: 1.5;
-  /* Dim via a muted colour, not opacity — opacity dragged the API-key link below AA. */
-  color: var(--wa-color-neutral-on-quiet, #b4b4bc);
-}
-
-.resynth-note a {
-  color: var(--wa-color-neutral-on-normal, #e6e6ea);
 }
 
 .resynth-drop {
@@ -190,51 +129,8 @@
   align-items: flex-start;
   gap: 0.75rem 1rem;
 }
-/* 1.4rem top margin lines this box up with the textarea box, which sits below its 1.4rem label. */
 .resynth-audio {
   flex: 1 1 18rem;
-  margin-top: 1.4rem;
-}
-.resynth-drop.disabled {
-  opacity: 0.4;
-  pointer-events: none;
-}
-.resynth-or {
-  align-self: center;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  opacity: 0.5;
-}
-.resynth-text-wrap {
-  display: flex;
-  flex: 1 1 18rem;
-  flex-direction: column;
-  gap: 0.3rem;
-  font-size: 0.72rem;
-}
-.resynth-text-label {
-  height: 1.1rem;
-  line-height: 1.1rem;
-  letter-spacing: 0.04em;
-  opacity: 0.75;
-}
-.resynth-text {
-  font: inherit;
-  font-size: 0.82rem;
-  resize: vertical;
-  /* border-box so the 5.5rem includes padding + border, like the drop/preview boxes. */
-  box-sizing: border-box;
-  min-height: 5.5rem;
-  padding: 0.5rem 0.6rem;
-  border-radius: 0.5rem;
-  border: 1px solid var(--xd-divider, #44444e);
-  background: var(--xd-group-bg, #18181c);
-  color: inherit;
-}
-.resynth-text:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 .resynth-clear {
   flex: none;

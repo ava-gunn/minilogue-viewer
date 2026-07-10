@@ -4,7 +4,7 @@ import { initMidiStatus } from './sections/midi-status'
 import { initShared } from './sections/shared'
 import type { SynthLink } from './services/synth-link'
 
-// Resynthesis (ONNX / Gemini) is lazy-loaded separately, so nothing here pulls onnxruntime into the initial bundle.
+// Resynthesis (ONNX) is lazy-loaded separately, so nothing here pulls onnxruntime into the initial bundle.
 export function initViewer(link: SynthLink): void {
   initLoad()
   initLibrary()

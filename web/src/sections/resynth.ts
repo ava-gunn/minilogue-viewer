@@ -1,4 +1,4 @@
-// Both engines (built-in model, Gemini) converge on a rawById map; see inference/decode + gemini/schema.
+// The built-in ONNX model matches audio to a rawById map; see inference/index + inference/decode.
 
 // CSS rides along in this lazily-loaded chunk so the viewer's initial bundle stays free of the form styles.
 import '../styles/resynth.css'
@@ -8,19 +8,7 @@ import { AUDIO_ACCEPT } from '../events/files'
 import { matchAudioRawById } from '../inference'
 import { rawByIdToPatch } from '../inference/decode'
 import { readRawById, writeProgBin } from '../parser/write'
-import {
-  getApiKey,
-  getModel,
-  hasApiKey,
-  setApiKey,
-  setModel,
-} from '../services/api-key'
-import {
-  type Engine,
-  type Rating,
-  submitContribution,
-} from '../services/contribute'
-import { analyzeAudio, analyzeText, MODELS } from '../services/gemini'
+import { type Rating, submitContribution } from '../services/contribute'
 import type { SynthLink } from '../services/synth-link'
 import { toast } from '../services/toast'
 import {
@@ -32,6 +20,9 @@ import {
 
 const STEPS = ['upload', 'patch', 'try', 'feedback'] as const
 type Step = (typeof STEPS)[number]
+
+// Label stored with each contribution to record which matcher produced it.
+const BUILTIN_MODEL = 'builtin-onnx'
 
 const byId = <T extends HTMLElement>(id: string): T | null =>
   document.getElementById(id) as T | null
@@ -48,36 +39,7 @@ const fmtTime = (s: number): string => {
 let file: File | undefined
 let rawById: Record<string, number> | undefined
 let patchName: string | undefined
-let lastRationale: string | undefined
-let lastAnalysis: Record<string, string> | undefined
 let objectUrl: string | undefined
-
-// .resynth-result uses white-space: pre-line, so the newlines below render as line breaks.
-const ANALYSIS_LABELS: Record<string, string> = {
-  sound_type: 'Type',
-  pitch: 'Pitch',
-  dynamics: 'Dynamics',
-  brightness: 'Brightness',
-  harmonics: 'Harmonics',
-  movement: 'Movement',
-  effects: 'Effects',
-  envelope: 'Envelope',
-  voice: 'Voice',
-}
-function formatResult(
-  rationale: string | undefined,
-  analysis: Record<string, string> | undefined,
-): string {
-  const blocks: string[] = []
-  if (rationale) blocks.push(rationale)
-  if (analysis) {
-    const lines = Object.entries(analysis)
-      .filter(([, v]) => typeof v === 'string' && v.trim())
-      .map(([k, v]) => `${ANALYSIS_LABELS[k] ?? k}: ${v}`)
-    if (lines.length) blocks.push(lines.join('\n'))
-  }
-  return blocks.join('\n\n')
-}
 
 export function initResynth(link: SynthLink): void {
   const stepEls = Array.from(
@@ -85,20 +47,11 @@ export function initResynth(link: SynthLink): void {
   )
   if (stepEls.length === 0) return // not on this page
 
-  const builtinRadio = byId<HTMLInputElement>('engine-builtin')
-  const geminiRadio = byId<HTMLInputElement>('engine-gemini')
-  const creds = byId('gemini-creds')
-  const keyInput = byId<HTMLInputElement>('gemini-key')
-  const modelSel = byId<HTMLSelectElement>('gemini-model')
-
   const drop = byId('resynth-drop')
   const fileBtn = byId<HTMLButtonElement>('resynth-file-btn')
   const fileInput = byId<HTMLInputElement>('resynth-file')
   const filename = byId('resynth-filename')
   const clearBtn = byId<HTMLButtonElement>('resynth-clear')
-  const textInput = byId<HTMLTextAreaElement>('resynth-text')
-  const textWrap = byId('resynth-text-wrap')
-  const orSep = byId('resynth-or')
 
   const preview = byId('resynth-preview')
   const canvas = byId<HTMLCanvasElement>('resynth-wave')
@@ -113,7 +66,6 @@ export function initResynth(link: SynthLink): void {
   const status = byId('resynth-status')
 
   const feedback = byId('resynth-feedback')
-  const feedbackRow = byId('resynth-feedback-row')
   const result = byId('resynth-result')
   const pitchSel = byId<HTMLSelectElement>('resynth-pitch')
   const asIsBtn = byId<HTMLButtonElement>('resynth-asis')
@@ -133,8 +85,6 @@ export function initResynth(link: SynthLink): void {
       else li.removeAttribute('aria-current')
     }
   }
-  const engine = (): Engine => (geminiRadio?.checked ? 'gemini' : 'builtin')
-
   let connected = false
   const updateLoad = (): void => {
     // Read live state (a captured template implies a connected+dumped synth) rather than the
@@ -144,47 +94,14 @@ export function initResynth(link: SynthLink): void {
     if (loadBtn) loadBtn.disabled = !ready
   }
 
-  if (modelSel && modelSel.options.length === 0) {
-    for (const m of MODELS) {
-      const opt = document.createElement('option')
-      opt.value = m
-      opt.textContent = m
-      modelSel.append(opt)
-    }
-  }
-  const syncEngine = (): void => {
-    const gemini = engine() === 'gemini'
-    creds?.toggleAttribute('hidden', !gemini)
-    // Text -> params is Gemini-only; the built-in model matches from audio, so hide the
-    // "or / Describe a patch" input for it.
-    textWrap?.toggleAttribute('hidden', !gemini)
-    orSep?.toggleAttribute('hidden', !gemini)
-    if (gemini) {
-      if (keyInput) keyInput.value = getApiKey()
-      if (modelSel) modelSel.value = getModel()
-    }
-    updateGenerate()
-  }
-  builtinRadio?.addEventListener('change', syncEngine)
-  geminiRadio?.addEventListener('change', syncEngine)
-  keyInput?.addEventListener('input', () => setApiKey(keyInput.value.trim()))
-  modelSel?.addEventListener('change', () => setModel(modelSel.value))
-
-  // waveformOk gates whether the screenshot is sent to Gemini; waveformDuration scales the envelope.
-  let waveformOk = false
-  let waveformDuration = 0
-  // Gates Generate until drawWaveform has finished, so the screenshot is ready before we send.
+  // Gates Generate until drawWaveform has finished so the audio is decoded before we match.
   let waveformReady = false
 
   const updateGenerate = (): void => {
-    const hasText = engine() === 'gemini' && !!textInput?.value.trim()
-    if (generateBtn)
-      generateBtn.disabled = !((file && waveformReady) || hasText)
+    if (generateBtn) generateBtn.disabled = !(file && waveformReady)
   }
 
   async function drawWaveform(f: File): Promise<void> {
-    waveformOk = false
-    waveformDuration = 0
     if (!canvas) return
     canvas.setAttribute('aria-label', `Waveform of ${f.name}`)
     const ctx = canvas.getContext('2d')
@@ -198,9 +115,8 @@ export function initResynth(link: SynthLink): void {
       ac = new AudioContext()
       const buf = await ac.decodeAudioData(await f.arrayBuffer())
       data = buf.getChannelData(0)
-      waveformDuration = buf.duration
     } catch {
-      // Undecodable here (Gemini may still accept it) — show a flat baseline.
+      // Undecodable — show a flat baseline.
     } finally {
       void ac?.close() // close on every path so bad files don't exhaust AudioContexts
     }
@@ -221,18 +137,6 @@ export function initResynth(link: SynthLink): void {
       }
       ctx.fillRect(x, mid + min * mid, 1, Math.max(1, (max - min) * mid))
     }
-    waveformOk = true
-  }
-
-  // Base64 PNG of the rendered waveform, no data: prefix (Gemini wants the bare payload).
-  const waveformPng = (): string | undefined => {
-    if (!canvas || !waveformOk) return undefined
-    try {
-      const url = canvas.toDataURL('image/png')
-      return url.slice(url.indexOf(',') + 1) || undefined
-    } catch {
-      return undefined
-    }
   }
 
   const loadPreview = (f: File): void => {
@@ -243,7 +147,7 @@ export function initResynth(link: SynthLink): void {
     if (progress) progress.style.width = '0%'
     preview?.removeAttribute('hidden')
     void drawWaveform(f).finally(() => {
-      // Enable even on decode failure: the audio can still be sent, just without the screenshot.
+      // Enable even on decode failure — the raw audio still feeds the matcher.
       waveformReady = true
       updateGenerate()
     })
@@ -276,15 +180,6 @@ export function initResynth(link: SynthLink): void {
     }
   })
 
-  // Audio and text inputs are mutually exclusive: content in one disables the other.
-  const syncInputs = (): void => {
-    const hasText = engine() === 'gemini' && !!textInput?.value.trim()
-    if (textInput) textInput.disabled = !!file
-    if (fileBtn) fileBtn.disabled = hasText
-    drop?.classList.toggle('disabled', hasText)
-    updateGenerate()
-  }
-
   const clearAudio = (): void => {
     file = undefined
     rawById = undefined
@@ -300,7 +195,7 @@ export function initResynth(link: SynthLink): void {
     feedback?.setAttribute('hidden', '')
     setStep('upload')
     setStatus('')
-    syncInputs()
+    updateGenerate()
   }
 
   const acceptAudio = (f: File): void => {
@@ -314,7 +209,7 @@ export function initResynth(link: SynthLink): void {
     if (filename) filename.textContent = f.name
     feedback?.setAttribute('hidden', '')
     drop?.setAttribute('hidden', '')
-    syncInputs()
+    updateGenerate()
     loadPreview(f)
     setStatus('')
     setStep('patch')
@@ -337,81 +232,28 @@ export function initResynth(link: SynthLink): void {
     const f = e.dataTransfer?.files?.[0]
     if (f) acceptAudio(f)
   })
-  textInput?.addEventListener('input', syncInputs)
   clearBtn?.addEventListener('click', clearAudio)
 
   generateBtn?.addEventListener('click', async () => {
-    const text = textInput?.value.trim() ?? ''
     const f = file
-    if (!f && !text) return
-    const eng = engine()
-    const useText = !f && eng === 'gemini'
-    // Text generation is Gemini-only; audio uses the selected engine. Either way Gemini needs a key.
-    if (!hasApiKey() && (useText || eng === 'gemini')) {
-      setStatus('Enter your Gemini API token first.')
-      keyInput?.focus()
-      return
-    }
+    if (!f) return
     if (generateBtn) generateBtn.disabled = true
     spinner?.removeAttribute('hidden')
-    setStatus(
-      useText
-        ? 'Designing…'
-        : eng === 'gemini'
-          ? `Asking ${getModel()}…`
-          : 'Matching…',
-    )
+    setStatus('Matching…')
     if (result) result.textContent = ''
     try {
-      let name: string | undefined
-      let rationale: string | undefined
-      let analysis: Record<string, string> | undefined
-      if (useText) {
-        const program = await analyzeText(text, {
-          apiKey: getApiKey(),
-          model: getModel(),
-          onProgress: setStatus,
-        })
-        rawById = program.rawById
-        name = program.name
-        rationale = program.rationale
-      } else if (f && eng === 'gemini') {
-        const program = await analyzeAudio(f, {
-          apiKey: getApiKey(),
-          model: getModel(),
-          waveformPng: waveformPng(),
-          durationSec: waveformDuration || undefined,
-          onProgress: setStatus,
-        })
-        rawById = program.rawById
-        name = program.name
-        rationale = program.rationale
-        analysis = program.analysis
-      } else if (f) {
-        rawById = await matchAudioRawById(f)
-        name = 'AI MATCH'
-      } else {
-        return
-      }
-      patchName = name
-      lastRationale = rationale
-      lastAnalysis = analysis
+      rawById = await matchAudioRawById(f)
+      patchName = 'AI MATCH'
       emit('patch:load', {
-        patch: rawByIdToPatch(rawById, name ?? 'AI MATCH'),
+        patch: rawByIdToPatch(rawById, patchName),
         index: 0,
         total: 1,
       })
       if (result) {
-        result.textContent =
-          formatResult(rationale, analysis) ||
-          'Patch loaded — try it on your minilogue xd.'
+        result.textContent = 'Patch loaded — try it on your minilogue xd.'
       }
-      // A pure text patch has no audio to contribute: hide the thumbs row and skip the captcha.
       feedback?.removeAttribute('hidden')
-      feedbackRow?.toggleAttribute('hidden', useText)
-      if (!useText && turnstileBox) {
-        void mountTurnstile(turnstileBox)
-      }
+      if (turnstileBox) void mountTurnstile(turnstileBox)
       setStep('try')
       setStatus('Done.')
       updateLoad()
@@ -468,11 +310,9 @@ export function initResynth(link: SynthLink): void {
         rawById: submitRaw,
         name: patchName,
         pitchMidi: Number(pitchSel?.value ?? 60),
-        model: getModel(),
-        engine: engine(),
+        model: BUILTIN_MODEL,
+        engine: 'builtin',
         rating: kind,
-        analysis: lastAnalysis,
-        rationale: lastRationale,
         turnstileToken: tsToken,
       })
       resetTurnstile()
@@ -507,7 +347,7 @@ export function initResynth(link: SynthLink): void {
     )
   })
 
-  syncEngine()
+  updateGenerate()
   setStep('upload')
   updateLoad()
 }

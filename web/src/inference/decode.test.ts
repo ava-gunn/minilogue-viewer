@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { programToRawById } from '../gemini/schema'
 import {
   booleanParams,
   continuousParams,
@@ -72,7 +71,7 @@ describe('outputsToPatch', () => {
 })
 
 describe('rawByIdToPatch', () => {
-  it('reconstructs a patch from raw param values by id (Gemini path)', () => {
+  it('reconstructs a patch from raw param values by id', () => {
     const patch = rawByIdToPatch({
       cutoff: 1023,
       resonance: 0,
@@ -96,15 +95,6 @@ describe('rawByIdToPatch', () => {
     expect(patch.name).toBe('TEST PAD')
     expect(patch.filter.cutoff).toBe(0)
     expect(patch.vco2.sync).toBe(false)
-  })
-
-  it('round-trips with programToRawById (Gemini output -> patch)', () => {
-    const patch = rawByIdToPatch(
-      programToRawById({ cutoff: 0.5, vco1_wave: 'TRI', mod_fx_on: true }),
-    )
-    expect(patch.filter.cutoff).toBeCloseTo(512 / 1023, 5)
-    expect(patch.vco1.wave).toBe('TRI')
-    expect(patch.modFx.on).toBe(true)
   })
 })
 

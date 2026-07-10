@@ -1,10 +1,9 @@
 // POST /api/contribute — receive an approved (audio + predicted program) pair from the
-// Gemini re-synthesis flow. Audio goes to Vercel Blob; a metadata record (rawById, pitch,
-// model, prompt/schema version) is stored alongside it as meta.json. Pulled into the
-// training repo later by training/data/pull_contributions.py.
+// built-in re-synthesis flow. Audio goes to Vercel Blob; a metadata record (rawById, pitch,
+// model, schema version) is stored alongside it as meta.json. Pulled into the training repo
+// later by training/data/pull_contributions.py.
 //
 // Audio clips are tiny (a 1s mono WAV is ~90 KB), well under Vercel's request body limit.
-// No Gemini key reaches the server — inference is browser-direct with the user's own key.
 
 import { randomUUID } from 'node:crypto'
 import { put } from '@vercel/blob'
@@ -178,30 +177,11 @@ export async function POST(req: Request): Promise<Response> {
     pitchMidi,
     model:
       typeof meta.model === 'string' ? meta.model.slice(0, MAX_NAME_LEN) : null,
-    engine:
-      meta.engine === 'builtin' || meta.engine === 'gemini'
-        ? meta.engine
-        : null,
+    engine: meta.engine === 'builtin' ? meta.engine : null,
     rating:
       meta.rating === 'as-is' || meta.rating === 'adjusted'
         ? meta.rating
         : null,
-    rationale:
-      typeof meta.rationale === 'string' ? meta.rationale.slice(0, 800) : null,
-    // Gemini's structured audio analysis — keep string fields only, length-capped.
-    analysis:
-      meta.analysis &&
-      typeof meta.analysis === 'object' &&
-      !Array.isArray(meta.analysis)
-        ? Object.fromEntries(
-            Object.entries(meta.analysis as Record<string, unknown>)
-              .filter(([, v]) => typeof v === 'string')
-              .slice(0, 12)
-              .map(([k, v]) => [k.slice(0, 40), (v as string).slice(0, 500)]),
-          )
-        : null,
-    promptVersion:
-      typeof meta.promptVersion === 'string' ? meta.promptVersion : null,
     schemaVersion:
       typeof meta.schemaVersion === 'string' ? meta.schemaVersion : null,
     createdAt: new Date().toISOString(),

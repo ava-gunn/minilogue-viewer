@@ -1,8 +1,9 @@
 // Pairs are later pulled into the training repo by training/data/pull_contributions.py.
 
-import { PROMPT_VERSION, SCHEMA_VERSION } from '../gemini/schema'
+// Byte-layout/schema version stamped onto every contribution for provenance.
+export const SCHEMA_VERSION = 'xd-params-52-v1'
 
-export type Engine = 'builtin' | 'gemini'
+export type Engine = 'builtin'
 /** 'as-is' = generated patch is a good match; 'adjusted' = user's hardware-tweaked version as a better label. */
 export type Rating = 'as-is' | 'adjusted'
 
@@ -14,9 +15,6 @@ export interface ContributionInput {
   model: string
   engine: Engine
   rating: Rating
-  /** Gemini's structured audio analysis + rationale (absent for the built-in engine). */
-  analysis?: Record<string, string> | undefined
-  rationale?: string | undefined
   turnstileToken?: string | undefined
 }
 
@@ -34,9 +32,6 @@ export async function submitContribution(
       model: input.model,
       engine: input.engine,
       rating: input.rating,
-      analysis: input.analysis,
-      rationale: input.rationale,
-      promptVersion: PROMPT_VERSION,
       schemaVersion: SCHEMA_VERSION,
     }),
   )
