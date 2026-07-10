@@ -114,6 +114,7 @@ def apply_continuous(base_raw: dict[str, int], x) -> dict[str, int]:
 
 
 def _write_wav(path: Path, audio: np.ndarray, sr: int) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     pcm = (np.clip(audio, -1.0, 1.0) * 32767.0).astype("<i2")
     with wave.open(str(path), "wb") as w:
         w.setnchannels(1)
@@ -133,7 +134,8 @@ def _accumulate(out: Path, raw: dict[str, int], audio: np.ndarray, sr: int) -> N
 
 def refine(target, session, template, render, *, threshold, evals, sigma, seed,
            search_discrete=False, disc_groups=(), disc_topk=4, disc_passes=2, lowpass=None,
-           anchor_octave=True, clap_rerank=False, clap_topk=8):
+           anchor_octave=True, clap_rerank=False, clap_topk=8,
+           rerank_dump=None, dump_label="", dump_src="", dump_pitch=0):
     """render(raw) -> recorded audio. Returns (best_raw, best_distance, best_audio)."""
     cont_o, disc_o, boo_o = infer.run_model(session, target)
     base_raw = infer.decode_raw(cont_o, disc_o, boo_o)
@@ -171,6 +173,12 @@ def refine(target, session, template, render, *, threshold, evals, sigma, seed,
         d_j, raw_j, audio_j = top[j]
         print(f"CLAP re-rank (top-{len(top)} by mss): mss-best={b_d:.4f} -> picked mss={d_j:.4f} "
               f"clap={cd[j]:.4f}" + ("  [same as mss-best]" if raw_j is b_raw else "  [DIFFERENT — CLAP override]"))
+        if rerank_dump and raw_j is not b_raw:  # stash both renders so the override can be A/B'd
+            dd = Path(rerank_dump); dd.mkdir(parents=True, exist_ok=True)
+            for tag, aud in (("mss", b_audio), ("clap", audio_j)):
+                _write_wav(dd / f"{dump_label}__{tag}" / "audio" / "000000.wav", aud, schema.AUDIO["sample_rate"])
+            with (dd / "targets.tsv").open("a") as tf:
+                tf.write(f"{dump_src}\t{dump_pitch}\t{dump_label}__mss\n{dump_src}\t{dump_pitch}\t{dump_label}__clap\n")
         return raw_j, d_j, audio_j
 
     if search_discrete and disc_groups:
@@ -261,6 +269,8 @@ def main() -> None:
     ap.add_argument("--clap-rerank", action="store_true",
                     help="re-rank the top-K mss candidates by CLAP-cosine and output the perceptual pick (CLAP validated as a re-ranker, not an inner-loop objective)")
     ap.add_argument("--clap-topk", type=int, default=8, help="how many top-mss candidates CLAP re-ranks")
+    ap.add_argument("--rerank-dump", type=Path, default=None,
+                    help="dir to stash BOTH the mss-best and CLAP-pick renders when they differ (for a validation A/B)")
     ap.add_argument("--accumulate", type=Path, default=None, help="dir to stash (params, audio) for proxy improvement")
     ap.add_argument("--midi-out", default="minilogue xd SOUND")
     ap.add_argument("--midi-in", default="minilogue xd KBD/KNOB")
@@ -294,6 +304,7 @@ def main() -> None:
             disc_groups=tuple(g.strip() for g in args.disc_groups.split(",") if g.strip()),
             disc_topk=args.disc_topk, disc_passes=args.disc_passes, lowpass=args.lowpass,
             anchor_octave=args.anchor_octave, clap_rerank=args.clap_rerank, clap_topk=args.clap_topk,
+            rerank_dump=args.rerank_dump, dump_label=args.target.stem, dump_src=str(args.target), dump_pitch=pitch,
         )
         korg.write_mnlgxdprog(args.template, xd_params.write_params(template, best_raw), args.out)
         print(f"wrote {args.out} (dist={best_d:.4f})")
