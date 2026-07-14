@@ -246,6 +246,7 @@ export function initResynth(link: SynthLink): void {
       patchName = 'AI MATCH'
       emit('patch:load', {
         patch: rawByIdToPatch(rawById, patchName),
+        rawById,
         index: 0,
         total: 1,
       })

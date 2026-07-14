@@ -20,10 +20,20 @@ export interface AppEventMap {
   'file:dropped': { file: File }
   'audio:dropped': { file: File }
   'file:parsed-lib': { name: string; patches: MinilogueXDPatch[] }
-  'patch:load': { patch: MinilogueXDPatch; index: number; total: number }
+  'patch:load': {
+    patch: MinilogueXDPatch
+    /** Raw values keyed by spec id, when the producer has them (randomize / resynth
+        match / hardware dump). Lets the lock feature hold a param at its exact value. */
+    rawById?: Record<string, number>
+    index: number
+    total: number
+  }
   'param:change': ParamChange
   /** Live value from the connected synth's physical control (mirrors a CC). */
   'param:live': ParamChange
+  /** A hardware knob turn as an exact raw value keyed by spec id — lets the lock
+      feature override a patch value with the value the user dialled in. */
+  'param:hw': { id: string; value: number }
   'file:error': { message: string }
   /** Live-MIDI connection state, for the /live page status indicator. */
   'midi:status': {

@@ -2,7 +2,7 @@
 // Overwrites only the param-region bytes of a valid 1024-byte program, leaving
 // header / name / sequence intact.
 
-import { readRawPatch } from './binary'
+import { type RawPatch, readRawPatch } from './binary'
 import { PARAM_SPEC } from './param-spec'
 
 const clampRound = (v: number, min: number, max: number): number =>
@@ -40,14 +40,18 @@ export function writeProgBin(
   return buf
 }
 
-/** Inverse of writeProgBin: read a prog_bin into raw values keyed by spec id — e.g. the live
- *  program captured from the connected synth, including the user's knob adjustments. */
-export function readRawById(prog: Uint8Array): Record<string, number> {
-  const raw = readRawPatch(prog)
+/** Raw values keyed by spec id, read straight from a decoded RawPatch. */
+export function rawPatchToById(raw: RawPatch): Record<string, number> {
   const out: Record<string, number> = {}
   for (const p of PARAM_SPEC) {
     const v = raw[p.field]
     if (typeof v === 'number') out[p.id] = v
   }
   return out
+}
+
+/** Inverse of writeProgBin: read a prog_bin into raw values keyed by spec id — e.g. the live
+ *  program captured from the connected synth, including the user's knob adjustments. */
+export function readRawById(prog: Uint8Array): Record<string, number> {
+  return rawPatchToById(readRawPatch(prog))
 }

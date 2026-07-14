@@ -77,6 +77,17 @@ describe('createLivePatch', () => {
     expect(changes.length).toBeGreaterThan(0)
   })
 
+  it('emits param:hw with the exact raw value a knob changed', () => {
+    const hw: Array<{ id: string; value: number }> = []
+    const offHw = on('param:hw', (e) => hw.push(e))
+    const live = createLivePatch()
+    live.loadDump(progBin)
+    live.controlChange(63, 7) // LSB (low 3 bits)
+    live.controlChange(43, 127) // cutoff MSB → (127<<3)|7 = 1023
+    expect(hw.at(-1)).toEqual({ id: 'cutoff', value: 1023 })
+    offHw()
+  })
+
   it('maps VPM sub-type CC#103 to distinct indices (no FAT2 dup, CREEP reachable)', () => {
     const live = createLivePatch()
     live.loadDump(progBin)

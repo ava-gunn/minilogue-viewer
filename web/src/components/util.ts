@@ -37,8 +37,9 @@ export function onParam(
   cb: (value: number, display: string | undefined) => void,
 ): () => void {
   return on(event, ({ section, key, value, display }) => {
-    if (section === el.dataset.section && key === el.dataset.paramKey) {
-      cb(value, display)
-    }
+    if (section !== el.dataset.section || key !== el.dataset.paramKey) return
+    // A locked control ignores live hardware knob turns — the needle stays frozen too.
+    if (event === 'param:live' && el.classList.contains('locked')) return
+    cb(value, display)
   })
 }

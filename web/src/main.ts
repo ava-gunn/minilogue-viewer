@@ -13,20 +13,25 @@ import { rawByIdToPatch } from './inference/decode'
 import { mountPanel } from './panel'
 import { randomSweepRawById } from './parser/random-patch'
 import { writeProgBin } from './parser/write'
+import { applyLocks, initLocks } from './services/locks'
 import { createSynthLink } from './services/synth-link'
 
 mountPanel()
 const link = createSynthLink()
 initViewer(link)
 
+const panelRoot = document.getElementById('panel-root')
+if (panelRoot) initLocks(panelRoot)
+
 const randomBtn = document.getElementById('random-patch')
 on('midi:status', ({ state }) => {
   randomBtn?.toggleAttribute('hidden', state !== 'connected')
 })
 randomBtn?.addEventListener('click', () => {
-  const raw = randomSweepRawById()
+  const raw = applyLocks(randomSweepRawById())
   emit('patch:load', {
     patch: rawByIdToPatch(raw, 'RANDOM'),
+    rawById: raw,
     index: 0,
     total: 1,
   })
@@ -35,7 +40,9 @@ randomBtn?.addEventListener('click', () => {
 })
 
 // On by default; set VITE_RESYNTH_ENABLED=false (or 0/off) to hide it. Bundle lazy-imported on first click.
-const flag = String(import.meta.env.VITE_RESYNTH_ENABLED ?? 'true').toLowerCase()
+const flag = String(
+  import.meta.env.VITE_RESYNTH_ENABLED ?? 'true',
+).toLowerCase()
 const RESYNTH_ENABLED = flag !== 'false' && flag !== '0' && flag !== 'off'
 
 const openBtn = document.getElementById('resynth-open')

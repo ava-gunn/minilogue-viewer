@@ -205,3 +205,29 @@ xd-knob[data-param-key="modeDepth"]::part(label) {
   padding-inline: var(--wa-space-m, 1rem);
   min-height: 1.5rem;
 }
+
+/* ── Parameter lock (hold a value through the randomize button) ─────────── */
+/* Only invites a click while a synth is connected (the randomize button is up). */
+.locks-enabled [data-param-key] {
+  cursor: pointer;
+}
+/* Locked: recolour the program indicator (every control reads --xd-knob-teal) and
+   drop a faint padlock at the top-right corner. */
+[data-param-key].locked {
+  --xd-knob-teal: var(--xd-knob-lock, #a78bfa);
+  --xd-lock-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 10V7a6 6 0 0 1 12 0v3h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h1zm2 0h8V7a4 4 0 0 0-8 0v3z'/%3E%3C/svg%3E");
+  position: relative;
+}
+[data-param-key].locked::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  inline-size: 0.62rem;
+  block-size: 0.62rem;
+  background: var(--xd-knob-lock, #a78bfa);
+  -webkit-mask: var(--xd-lock-icon) center / contain no-repeat;
+  mask: var(--xd-lock-icon) center / contain no-repeat;
+  opacity: 0.5;
+  pointer-events: none;
+}

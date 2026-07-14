@@ -6,6 +6,7 @@ import { emit } from '../events/bus'
 import { type RawPatch, readRawPatch } from '../parser/binary'
 import { MULTI_ENGINE_COUNT, MULTI_TYPE, VOICE_MODE } from '../parser/enums'
 import { parsePatch } from '../parser/patch'
+import { rawPatchToById, readRawById } from '../parser/write'
 import { PARAMS, type ParamDescriptor } from '../sections/params'
 import type { MinilogueXDPatch } from '../types/synth'
 
@@ -425,7 +426,12 @@ export function createLivePatch(): LivePatch {
   function loadDump(prog: Uint8Array): void {
     raw = readRawPatch(prog)
     const patch = parsePatch(raw)
-    emit('patch:load', { patch, index: 0, total: 1 })
+    emit('patch:load', {
+      patch,
+      rawById: readRawById(prog),
+      index: 0,
+      total: 1,
+    })
   }
 
   function setBaseline(prog: Uint8Array): void {
@@ -442,7 +448,13 @@ export function createLivePatch(): LivePatch {
     pendingLsb = 0
     if (!spec || !raw) return
 
+    const before = rawPatchToById(raw)
     spec.apply(raw, value, lsb)
+    const after = rawPatchToById(raw)
+    // Exact raw value(s) the knob just changed — the lock feature holds these over patch values.
+    for (const id in after) {
+      if (after[id] !== before[id]) emit('param:hw', { id, value: after[id] })
+    }
     const patch = parsePatch(raw)
     // The multi engine couples select/shape/type, so refresh the whole section.
     for (const d of PARAMS) {
