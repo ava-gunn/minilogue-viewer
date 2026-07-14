@@ -15,6 +15,7 @@ import json
 import math
 import signal
 import sys
+import time
 import wave
 from pathlib import Path
 
@@ -87,6 +88,10 @@ def main() -> None:
     # One pitch per patch keeps params -> audio a clean function for the proxy; pass more
     # (e.g. 36,60,84) for a pitch-robust set — each pitch is recorded as its own clip.
     ap.add_argument("--pitches", default="60", help="MIDI notes per patch (e.g. C4, or 36,60,84)")
+    ap.add_argument("--patches", type=Path, default=None,
+                    help="render a saved [M,D] unit-vector set (from select_diverse) instead of a fresh Sobol sequence")
+    ap.add_argument("--max-hours", type=float, default=None,
+                    help="stop cleanly after this many hours (between patches) — for resumable 8h nightly batches")
     args = ap.parse_args()
 
     # A kill (SIGTERM) should still run the finally below (close -> panic) so a note
@@ -115,10 +120,17 @@ def main() -> None:
                 "calibration silent — check Korg power/volume + Volt input gain/connection"
             )
 
-        # The full Sobol sequence is deterministic in (seed, n_patches), so resuming is just
-        # indexing into it — regenerate, then skip the patches already on disk.
-        n_patches = math.ceil(args.n / len(pitches))
-        sweep = xd_params.sobol_unit(n_patches, args.seed)
+        # A fixed patch sequence — Sobol (deterministic in (seed, n_patches)) or a saved selection
+        # (select_diverse) — so resuming is just indexing into it: (re)build, then skip patches
+        # already on disk. --patches lets a diversity-selected set drive the sweep.
+        if args.patches is not None:
+            sweep = np.load(args.patches)
+            n_patches = len(sweep)
+            print(f"loaded {n_patches} selected patches from {args.patches}")
+        else:
+            n_patches = math.ceil(args.n / len(pitches))
+            sweep = xd_params.sobol_unit(n_patches, args.seed)
+        target = n_patches * len(pitches)
 
         # Resume by render count, aligned to whole patches (drop a partial patch's
         # renders from a prior crash so labels/ids stay consistent).
@@ -128,16 +140,20 @@ def main() -> None:
             lines = (out / "samples.jsonl").read_text().splitlines()[:whole]
             (out / "samples.jsonl").write_text("\n".join(lines) + ("\n" if lines else ""))
             start = whole
-        if start >= args.n:
-            print(f"already have {start} >= {args.n} renders at {out}")
+        if start >= target:
+            print(f"already have {start} >= {target} renders at {out}")
             return
         patches_done = start // len(pitches)
-        print(f"resuming at {start} renders ({patches_done}/{n_patches} patches), target {args.n}; "
+        print(f"resuming at {start} renders ({patches_done}/{n_patches} patches), target {target}; "
               f"pitches {pitches}, audible={args.audible}")
 
         kept = start
+        t_start = time.time()
         with keep_awake(), (out / "samples.jsonl").open("a") as manifest:
             for patch in range(patches_done, n_patches):
+                if args.max_hours and (time.time() - t_start) > args.max_hours * 3600:
+                    print(f"reached --max-hours {args.max_hours} at {kept}/{target} renders — stopping (resume next run)")
+                    break
                 prog_bin, targets = xd_params.sample(template, sweep[patch], audible=args.audible)
                 xd.send_patch(prog_bin, settle_s=args.settle)
                 lines = []
@@ -150,7 +166,7 @@ def main() -> None:
                 manifest.write("\n".join(lines) + "\n")  # whole patch flushed together
                 manifest.flush()
                 if kept % 30 == 0:
-                    print(f"{kept}/{args.n} renders")
+                    print(f"{kept}/{target} renders")
         print(f"done: {kept} renders at {out}")
     finally:
         # Leave a benign patch loaded so a final high-resonance random patch can't sit
