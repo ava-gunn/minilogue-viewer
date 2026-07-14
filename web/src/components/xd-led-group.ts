@@ -33,6 +33,18 @@ const styles = `
     outline-offset: 1px;
   }
 
+  /* Locked + user-adjusted: a single LED in the lock colour at the held row —
+     the live LED fills purple, the program LED reverts to its off state. */
+  :host(.locked[live]) .row.prog .led {
+    background: var(--xd-led-off, #14302c);
+    box-shadow: inset 0 0 0 1px #0008;
+  }
+  :host(.locked[live]) .row.live .led {
+    background: var(--xd-knob-lock, #a78bfa);
+    outline-color: var(--xd-knob-lock, #a78bfa);
+    box-shadow: 0 0 4px var(--xd-knob-lock, #a78bfa), inset 0 0 0 1px #0008;
+  }
+
   .led-label {
     font-size: 0.5rem;
     letter-spacing: 0.04em;

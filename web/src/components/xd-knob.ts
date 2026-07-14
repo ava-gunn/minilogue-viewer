@@ -43,6 +43,14 @@ const styles = `
   }
   :host(:not([live])) .indicator.live { display: none; }
 
+  /* Locked + user-adjusted: collapse to a single needle in the lock colour at the
+     held (live) value — the live needle turns purple, the program needle goes away. */
+  :host(.locked[live]) .indicator.program { display: none; }
+  :host(.locked[live]) .indicator.live {
+    width: 2px;
+    background: var(--xd-knob-lock, #a78bfa);
+  }
+
   .label {
     font-size: 0.6rem;
     letter-spacing: 0.08em;

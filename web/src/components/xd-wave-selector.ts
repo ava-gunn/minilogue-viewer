@@ -62,6 +62,16 @@ const styles = `
   }
   :host(:not([live])) .marker.live { display: none; }
 
+  /* Locked + user-adjusted: a single marker in the lock colour at the held slot —
+     the live marker fills purple, the program marker and its glyph highlight go away. */
+  :host(.locked[live]) .marker.program { display: none; }
+  :host(.locked[live]) .marker.live {
+    background: var(--xd-knob-lock, #a78bfa);
+    outline: none;
+    box-shadow: 0 0 4px var(--xd-knob-lock, #a78bfa);
+  }
+  :host(.locked[live]) .wave.on { color: var(--xd-label-color, #8a8a92); }
+
   .ticks {
     display: flex;
     flex-direction: column;
