@@ -39,6 +39,8 @@ training/data/contrib_accepted/
 training/eval/set/
 training/.nightly.log
 training/.nightly.lock
+training/.diversity-sweep.loop.log
+training/.sweep.lock
 
 # local-only working files (audio targets, patch libraries, scratch notes), kept out of git
 /_local/

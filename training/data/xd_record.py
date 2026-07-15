@@ -92,6 +92,10 @@ def main() -> None:
                     help="render a saved [M,D] unit-vector set (from select_diverse) instead of a fresh Sobol sequence")
     ap.add_argument("--max-hours", type=float, default=None,
                     help="stop cleanly after this many hours (between patches) — for resumable 8h nightly batches")
+    ap.add_argument("--cal-min-rms", type=float, default=RMS_FLOOR,
+                    help="preflight gate: bail if the calibration render RMS is below this (silent / too quiet)")
+    ap.add_argument("--cal-max-rms", type=float, default=None,
+                    help="preflight gate: bail if the calibration render RMS is above this (too hot / clipping)")
     args = ap.parse_args()
 
     # A kill (SIGTERM) should still run the finally below (close -> panic) so a note
@@ -115,9 +119,15 @@ def main() -> None:
         xd.send_patch(template, settle_s=args.settle)
         cal_rms = float(np.sqrt(np.mean(xd.record(gate_s=args.gate, duration_s=args.duration) ** 2)))
         print(f"calibration rms={cal_rms:.4f}")
-        if cal_rms < RMS_FLOOR:
+        if cal_rms < args.cal_min_rms:
             raise RuntimeError(
-                "calibration silent — check Korg power/volume + Volt input gain/connection"
+                f"calibration rms {cal_rms:.4f} < min {args.cal_min_rms:.4f} — silent/too quiet "
+                "(check Korg power/volume + Volt input gain/connection)"
+            )
+        if args.cal_max_rms is not None and cal_rms > args.cal_max_rms:
+            raise RuntimeError(
+                f"calibration rms {cal_rms:.4f} > max {args.cal_max_rms:.4f} — too hot/clipping "
+                "(lower the master out / Volt input gain)"
             )
 
         # A fixed patch sequence — Sobol (deterministic in (seed, n_patches)) or a saved selection
