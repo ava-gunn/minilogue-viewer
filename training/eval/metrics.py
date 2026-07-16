@@ -59,6 +59,32 @@ def multiscale_stft_l1(a: np.ndarray, b: np.ndarray, ffts=(512, 1024, 2048)) -> 
     return total / len(ffts)
 
 
+def f0_cents_distance(a: np.ndarray, b: np.ndarray) -> float:
+    """|Δcents| between the voiced-median F0 (pyin) of two clips. Returns 0 when either clip is
+    unvoiced — pitch isn't measurable there, so don't penalize on that axis. Recovers the pitch
+    dimension that frame-spectral metrics (mss / mfcc) are blind to. Lower = closer in pitch."""
+    import librosa
+
+    def median_f0(x: np.ndarray) -> float | None:
+        f0, voiced, _ = librosa.pyin(
+            np.asarray(x, dtype=np.float32),
+            sr=SR,
+            fmin=float(librosa.note_to_hz("C2")),
+            fmax=float(librosa.note_to_hz("C7")),
+        )
+        # Require a clear voiced majority — pyin false-positives sporadic "pitch" on noise /
+        # percussive patches; those should read as not-measurable, not a spurious F0.
+        if float(np.mean(voiced)) < 0.5:
+            return None
+        vf = f0[np.isfinite(f0) & voiced]
+        return float(np.median(vf)) if vf.size else None
+
+    fa, fb = median_f0(a), median_f0(b)
+    if not fa or not fb:
+        return 0.0
+    return abs(1200.0 * float(np.log2(fa / fb)))
+
+
 def compare(source: np.ndarray, xd: np.ndarray, *, lowpass_hz: float | None = None) -> dict:
     """Distances between an original clip and an XD render of the predicted program."""
     a = rms_normalize(fit(source))

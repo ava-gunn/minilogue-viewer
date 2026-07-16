@@ -47,7 +47,11 @@ def _mfcc(t, c):
                           - librosa.feature.mfcc(y=c, sr=SR, n_mfcc=13)) ** 2))
 
 
-SPECTRAL = {"mss_l1": _mss, "centroid": _centroid, "mfcc": _mfcc}
+def _f0(t, c):  # cheap pitch term — the axis mss/mfcc are blind to
+    return metrics.f0_cents_distance(t, c)
+
+
+SPECTRAL = {"mss_l1": _mss, "centroid": _centroid, "mfcc": _mfcc, "f0": _f0}
 
 
 def _clap_load(path: Path) -> np.ndarray:
@@ -74,6 +78,7 @@ def main() -> None:
     ap.add_argument("--results", default=str(_REPO / "tools/abtest/results/*.json"),
                     help="glob of tools/abtest result JSONs (ground truth)")
     ap.add_argument("--no-clap", action="store_true", help="skip CLAP-cosine (fast, spectral-only)")
+    ap.add_argument("--no-cdpam", action="store_true", help="skip CDPAM (needs `pip install cdpam`)")
     args = ap.parse_args()
 
     embedder = None
@@ -81,6 +86,15 @@ def main() -> None:
         print("loading CLAP...")
         from training.data.embed import ClapEmbedder
         embedder = ClapEmbedder()
+
+    cdpam_scorer = None
+    if not args.no_cdpam:
+        try:
+            from training.eval.cdpam_metric import CdpamScorer
+            print("loading CDPAM...")
+            cdpam_scorer = CdpamScorer()
+        except Exception as e:
+            print(f"  CDPAM unavailable ({e}) — skipping (pip install cdpam)")
 
     from scipy.stats import binomtest
 
@@ -108,6 +122,9 @@ def main() -> None:
                     et, ep, eo = embedder.embed_batch(
                         [_clap_load(Path(src)), _clap_load(pw), _clap_load(ow)], CLAP_SR)
                     dp["clap"], do["clap"] = _cos_dist(ep, et), _cos_dist(eo, et)
+                if cdpam_scorer is not None:
+                    dp["cdpam"] = cdpam_scorer.distance(rp, tgt)
+                    do["cdpam"] = cdpam_scorer.distance(ro, tgt)
             except Exception as e:
                 print(f"  skip {picked}: {e}"); continue
             pairs.append((Path(f).name, dp, do)); n_dec += 1
@@ -121,8 +138,17 @@ def main() -> None:
     means = {k: np.mean([v for _n, dp, do in pairs for v in (dp[k], do[k])]) for k in keys}
     stds = {k: (np.std([v for _n, dp, do in pairs for v in (dp[k], do[k])]) or 1.0) for k in keys}
 
+    _learned = ("clap", "cdpam")  # keep composites model-free unless explicitly combining
     scorers = {k: (lambda dd, k=k: dd[k]) for k in keys}
-    scorers["composite(spectral z)"] = lambda dd: sum((dd[k] - means[k]) / stds[k] for k in keys if k != "clap")
+    scorers["composite(spectral z)"] = lambda dd: sum(
+        (dd[k] - means[k]) / stds[k] for k in keys if k not in _learned)
+    if "f0" in keys:  # cheap timbre+pitch on complementary axes (mss is chance → dilutes; mfcc isn't)
+        scorers["mss+f0(z)"] = lambda dd: (
+            (dd["mss_l1"] - means["mss_l1"]) / stds["mss_l1"]
+            + (dd["f0"] - means["f0"]) / stds["f0"])
+        scorers["mfcc+f0(z)"] = lambda dd: (
+            (dd["mfcc"] - means["mfcc"]) / stds["mfcc"]
+            + (dd["f0"] - means["f0"]) / stds["f0"])
     if "clap" in keys:
         scorers["mfcc+clap(z)"] = lambda dd: sum((dd[k] - means[k]) / stds[k] for k in ("mfcc", "clap"))
 
@@ -131,12 +157,16 @@ def main() -> None:
         w, n = _rate(pairs, sc)
         print(f"{name:24s} {str(w) + '/' + str(n):>8s} {w/n:>5.0%} {binomtest(w, n, 0.5, alternative='greater').pvalue:>9.3f}")
 
-    cols = [k for k in ("mss_l1", "mfcc", "clap") if k in keys]
-    print(f"\nper-A/B (decisive n; {'; '.join(cols)}):")
+    # Per-A/B breakdown — includes the pitch-sensitive scorers so we can see if mss+f0 recovers
+    # the pitch A/B (where only CLAP is above chance today).
+    show = [s for s in ("mss_l1", "f0", "mfcc", "mfcc+f0(z)", "clap", "cdpam") if s in scorers]
+    print(f"\nper-A/B (decisive n; {'; '.join(show)}):")
     for name, _n in used:
         sub = [p for p in pairs if p[0] == name]
-        cells = " ".join(f"{k} {(_rate(sub, (lambda dd, k=k: dd[k]))[0] / max(1, _rate(sub, (lambda dd, k=k: dd[k]))[1])):>4.0%}" for k in cols)
-        print(f"    {name:30s} n={_rate(sub, (lambda dd: dd[cols[0]]))[1]:>2d}  {cells}")
+        n_sub = _rate(sub, scorers[show[0]])[1]
+        cells = " ".join(
+            f"{s} {(_rate(sub, scorers[s])[0] / max(1, _rate(sub, scorers[s])[1])):>4.0%}" for s in show)
+        print(f"    {name:30s} n={n_sub:>2d}  {cells}")
 
 
 if __name__ == "__main__":
