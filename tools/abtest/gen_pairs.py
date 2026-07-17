@@ -54,6 +54,11 @@ def main() -> None:
     ap.add_argument("--conflict-frac", type=float, default=0.5, help="fraction that are pitch-vs-timbre conflict")
     ap.add_argument("--rms-min", type=float, default=0.01, help="drop renders quieter than this (manifest rms)")
     ap.add_argument("--pitch-shift", type=int, default=24, help="conflict A's note offset from the target (semitones)")
+    ap.add_argument("--mode", choices=["phase0", "hard"], default="phase0",
+                    help="phase0 = easy/medium/conflict; hard = close (both candidates near the target, "
+                         "deployment-like subtle call) + conflict")
+    ap.add_argument("--close-k", type=int, default=6,
+                    help="hard mode: B is drawn from the target's rank-2..close-k nearest patches")
     ap.add_argument("--repeat-frac", type=float, default=0.2, help="re-emit this fraction as independent _rep trials")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
@@ -93,7 +98,8 @@ def main() -> None:
     targets = _farthest_point(full, min(args.n_targets * 3, P))
 
     n_conflict = round(args.conflict_frac * args.n_targets)
-    strata = ["conflict"] * n_conflict + ["easy", "medium"] * args.n_targets
+    base = ["close"] if args.mode == "hard" else ["easy", "medium"]
+    strata = ["conflict"] * n_conflict + base * args.n_targets
     rng.shuffle(strata)
 
     trials, used_t, si = [], 0, 0
@@ -123,6 +129,14 @@ def main() -> None:
                 continue
             a = (patches[near], alt, "timbre")            # right timbre, wrong pitch
             b = (patches[far], pit, "pitch")              # right pitch, wrong timbre
+        elif stratum == "close":  # both candidates near the target — subtle, deployment-like call
+            window = [j for j in np.argsort(dfull)
+                      if dfull[j] > 1e-4 and note_ok(j, pit) and j not in (int(t), int(near))][: args.close_k - 1]
+            if not window:
+                continue
+            far = int(rng.choice(window))
+            a = (patches[near], pit, "near")              # rank-1 nearest
+            b = (patches[far], pit, "far")                # rank 2..close-k (still near)
         else:
             lo, hi = (0.9, 1.0) if stratum == "easy" else (0.45, 0.6)  # far-band difficulty
             far = pick_band(dfull, lo, hi, pit, {int(t), int(near)})
@@ -167,7 +181,7 @@ def main() -> None:
     (out / "pairs.jsonl").write_text("".join(json.dumps(s) + "\n" for s in side))
     n_conf = sum(t["stratum"] == "conflict" for _n, t in batch)
     print(f"wrote {len(batch)} trials ({len(rows)} rows) to {out}\n"
-          f"  strata: {n_conf} conflict, {len(batch) - n_conf} easy/medium (+repeats); {P} patches in pool\n"
+          f"  strata: {n_conf} conflict, {len(batch) - n_conf} {'close' if args.mode == 'hard' else 'easy/medium'} (+repeats); {P} patches in pool\n"
           f"  serve: training/.venv/bin/python tools/abtest/serve.py --tsv {out}/targets.tsv --renders {out} --open")
 
 
