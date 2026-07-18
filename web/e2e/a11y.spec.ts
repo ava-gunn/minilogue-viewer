@@ -27,8 +27,6 @@ test('re-synth form: no WCAG A/AA axe violations', async ({ page }) => {
   await page.goto('/')
   await page.locator('main#main').waitFor()
   const open = page.locator('#resynth-open')
-  // Skipped when the feature flag is off (the button is disabled and the form never loads).
-  test.skip(await open.isDisabled(), 'Resynthesis disabled (VITE_RESYNTH_ENABLED off)')
   await open.click()
   await page.locator('#resynth-form:not([hidden])').waitFor()
   const { violations } = await new AxeBuilder({ page }).withTags(wcag).analyze()
