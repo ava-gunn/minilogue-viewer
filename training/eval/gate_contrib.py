@@ -1,7 +1,7 @@
 """Hardware-free quality gate for pulled contributions.
 
-Contributions are Gemini PSEUDO-LABELS — params it guessed for some audio, never rendered on
-the XD — so we can't score them against a ground-truth render without the hardware. Instead we
+Contributions are PSEUDO-LABELS — params the built-in ONNX matcher predicted for some audio, never
+rendered on the XD — so we can't score them against a ground-truth render without the hardware. Instead we
 use the trained CLAP proxy as a stand-in for the synth: run each contribution's params through
 the proxy to predict an audio embedding, and compare it (cosine) to the actual CLAP embedding of
 the contribution's audio. High cosine = "params are consistent with the audio per the proxy's

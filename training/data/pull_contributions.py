@@ -1,10 +1,10 @@
-"""Pull Gemini re-synthesis contributions (audio + predicted program) from the deployed app
+"""Pull built-in re-synthesis contributions (audio + predicted program) from the deployed app
 into the local contributions split, then clear them from Vercel Blob.
 
-Submissions are PSEUDO-LABELS: the audio was not rendered by the XD with these params — Gemini
-guessed them and a user approved them — so they're flagged source="gemini" and live in their own
-split (training/data/contrib), kept apart from the Sobol-sweep ground truth the proxy/encoder
-train on.
+Submissions are PSEUDO-LABELS: the audio was not rendered by the XD with these params — the built-in
+ONNX matcher predicted them and a user approved them — so they're flagged source="builtin" and live
+in their own split (training/data/contrib), kept apart from the Sobol-sweep ground truth the
+proxy/encoder train on.
 
     CONTRIB_API_URL=https://your-app.vercel.app \\
     CONTRIB_ADMIN_TOKEN=... \\
@@ -146,8 +146,8 @@ def _write_meta(out: Path) -> None:
                 "boolean": [p["id"] for p in schema.BOOLEAN],
                 "sample_rate": SR,
                 "duration_s": schema.AUDIO["duration_s"],
-                "source": "gemini",
-                "note": "pseudo-labeled: programs predicted by Gemini, approved by a user",
+                "source": "builtin",
+                "note": "pseudo-labeled: programs from the built-in ONNX matcher, approved by a user",
             }
         )
     )
@@ -214,7 +214,7 @@ def main() -> None:
                 **xd_params._targets(raw_by_id),
                 "pitch": int(rec.get("pitchMidi", 60)),
                 "rms": rms,
-                "source": "gemini",
+                "source": "builtin",
                 "engine": rec.get("engine"),
                 "rating": rec.get("rating"),
                 "model": rec.get("model"),
