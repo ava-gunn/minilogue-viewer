@@ -1,4 +1,6 @@
 import { initialize, type ActivationContext } from "@ableton-extensions/sdk"
+import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { join } from "node:path"
 import { openBrowser } from "./open-browser.js"
 import viewerHtml from "./viewer.generated.html"
 
@@ -26,27 +28,66 @@ const SCOPES = [
   "Simpler",
 ] as const
 
+const RATINGS_FILE = "ratings.json"
+
+/** Load persisted star ratings from the extension's storage directory (empty if none/unavailable). */
+async function loadRatings(dir: string | undefined): Promise<Record<string, number>> {
+  if (!dir) return {}
+  try {
+    const parsed = JSON.parse(await readFile(join(dir, RATINGS_FILE), "utf8"))
+    return parsed && typeof parsed === "object"
+      ? (parsed as Record<string, number>)
+      : {}
+  } catch {
+    return {} // missing on first run, or unreadable
+  }
+}
+
+/** Persist star ratings to the extension's storage directory (best-effort). */
+async function saveRatings(dir: string | undefined, ratings: unknown): Promise<void> {
+  if (!dir || !ratings || typeof ratings !== "object") return
+  try {
+    await mkdir(dir, { recursive: true })
+    await writeFile(join(dir, RATINGS_FILE), JSON.stringify(ratings), "utf8")
+  } catch (err) {
+    console.error("[minilogue-xd-viewer] failed to persist ratings", err)
+  }
+}
+
 export function activate(activation: ActivationContext) {
   const context = initialize(activation, "1.0.0")
 
   context.commands.registerCommand(VIEWER_ID, async () => {
+    // Live populates this at runtime; undefined under the standalone CLI (no persistence there).
+    const storageDir = context.environment.storageDirectory
     try {
-      // The viewer is bundled as a single self-contained HTML (no network, no model), shown
-      // in a modal WebView. Its Resynthesis link posts {action:'open-url'} via the host
-      // bridge, which closes the dialog and returns here — we then open the system browser.
+      // The viewer is bundled as a single self-contained HTML (no network, no model), shown in a
+      // modal WebView. localStorage is blocked in its opaque data:-URL origin, so we seed prior
+      // ratings as a global the bundle reads at startup; the viewer hands the updated map back on
+      // close (host-bridge close_and_send payload), which we then persist.
+      const ratings = await loadRatings(storageDir)
+      const seed = `<script>window.__XD_RATINGS__=${JSON.stringify(ratings).replace(/</g, "\\u003c")}</script>`
+      const html = viewerHtml.replace("<head>", `<head>${seed}`)
+
+      // Its Resynthesis link posts {action:'open-url'} via the host bridge, which closes the dialog
+      // and returns here — we then open the system browser.
       const result = await context.ui.showModalDialog(
-        `data:text/html,${encodeURIComponent(viewerHtml)}`,
+        `data:text/html,${encodeURIComponent(html)}`,
         VIEWER_WIDTH,
         VIEWER_HEIGHT,
       )
-      // The viewer closes the dialog via close_and_send; "open-url" also opens the browser,
-      // "close" just dismisses (nothing more to do here).
-      const data = JSON.parse(result) as { action?: string; url?: string }
+      // The viewer closes the dialog via close_and_send, returning { action, url?, ratings? }.
+      const data = JSON.parse(result) as {
+        action?: string
+        url?: string
+        ratings?: Record<string, number>
+      }
+      await saveRatings(storageDir, data.ratings)
       if (data.action === "open-url" && typeof data.url === "string") {
         openBrowser(data.url)
       }
     } catch {
-      // dialog closed without a result — nothing to do
+      // dialog closed without a result (e.g. native window close) — this session's ratings aren't saved
     }
   })
 

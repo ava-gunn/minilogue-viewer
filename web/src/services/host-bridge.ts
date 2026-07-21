@@ -2,6 +2,8 @@
 // channel: { method, params } where the payload becomes the showModalDialog() return value
 // (which also closes the dialog).
 
+import { getAllRatings } from './ratings'
+
 interface HostBridge {
   postMessage(message: { method: string; params: string[] }): void
 }
@@ -25,9 +27,11 @@ function host(): HostBridge | undefined {
 function sendAndClose(payload: Record<string, unknown>): boolean {
   const bridge = host()
   if (!bridge) return false
+  // Ride the current ratings map out on every close so the host can persist it — the modal's
+  // opaque data:-URL origin can't write to disk itself.
   bridge.postMessage({
     method: 'close_and_send',
-    params: [JSON.stringify(payload)],
+    params: [JSON.stringify({ ...payload, ratings: getAllRatings() })],
   })
   return true
 }

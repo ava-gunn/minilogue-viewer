@@ -19,7 +19,12 @@ export interface ParamChange {
 export interface AppEventMap {
   'file:dropped': { file: File }
   'audio:dropped': { file: File }
-  'file:parsed-lib': { name: string; patches: MinilogueXDPatch[] }
+  'file:parsed-lib': {
+    name: string
+    patches: MinilogueXDPatch[]
+    /** Stable content-hash key per patch (same order as `patches`), for rating persistence. */
+    keys?: string[]
+  }
   'patch:load': {
     patch: MinilogueXDPatch
     /** Raw values keyed by spec id, when the producer has them (randomize / resynth
