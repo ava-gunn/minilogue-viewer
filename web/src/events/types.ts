@@ -24,6 +24,8 @@ export interface AppEventMap {
     patches: MinilogueXDPatch[]
     /** Stable content-hash key per patch (same order as `patches`), for rating persistence. */
     keys?: string[]
+    /** Raw 1024-byte prog_bin per patch (same order), for lossless library re-export. */
+    bins?: Uint8Array[]
   }
   'patch:load': {
     patch: MinilogueXDPatch

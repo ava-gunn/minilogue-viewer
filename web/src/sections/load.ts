@@ -1,9 +1,22 @@
 import { emit, on } from '../events/bus'
 import { parseLibrary } from '../parser'
+import { buildLibrary } from '../parser/write-library'
 import { getRating, MAX_STARS, setRating } from '../services/ratings'
 import type { MinilogueXDPatch } from '../types/synth'
 
 // No audio/inference dependency: shared with the Ableton embed (embed.ts), which must stay ONNX-free.
+
+/** Trigger a browser download of raw bytes as `filename`. */
+function downloadFile(filename: string, bytes: Uint8Array): void {
+  const url = URL.createObjectURL(
+    new Blob([bytes as BlobPart], { type: 'application/octet-stream' }),
+  )
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 export function initLoad(): void {
   on('file:dropped', async ({ file }) => {
@@ -20,6 +33,7 @@ export function initLoad(): void {
           name: file.name,
           patches,
           keys: entries.map((e) => e.key),
+          bins: entries.map((e) => e.bytes),
         })
       }
       emit('patch:load', { patch: patches[0], index: 0, total: patches.length })
@@ -31,7 +45,7 @@ export function initLoad(): void {
 }
 
 export function initLibrary(): void {
-  on('file:parsed-lib', ({ patches, keys }) => {
+  on('file:parsed-lib', ({ name, patches, keys, bins }) => {
     const panel = document.getElementById('library-panel')
     const list = document.getElementById('program-list')
     if (!panel || !list) return
@@ -47,6 +61,7 @@ export function initLibrary(): void {
     let minStars = 0 // 0 = no minimum
     let unratedOnly = false
     let countEl: HTMLElement | null = null
+    let exportBtn: HTMLButtonElement | null = null
 
     const applyFilter = (): void => {
       let shown = 0
@@ -57,6 +72,7 @@ export function initLibrary(): void {
         if (match) shown++
       })
       if (countEl) countEl.textContent = `${shown} of ${patches.length}`
+      if (exportBtn) exportBtn.disabled = shown === 0 || !bins
     }
 
     // 0–5 star control for one option; re-renders in place and re-applies the active filter.
@@ -191,7 +207,34 @@ export function initLibrary(): void {
     })
     countEl = document.createElement('span')
     countEl.className = 'library-count'
-    bar.append(filterLabel, filterSel, countEl)
+
+    // Export the currently-shown patches as a fresh .mnlgxdlib (lossless — reuses the source bytes).
+    exportBtn = document.createElement('button')
+    exportBtn.type = 'button'
+    exportBtn.id = 'library-export'
+    exportBtn.className = 'library-export'
+    exportBtn.textContent = 'Export'
+    exportBtn.title = 'Export the shown patches as a new .mnlgxdlib library'
+    exportBtn.addEventListener('click', () => {
+      if (!bins) return
+      const chosen: Uint8Array[] = []
+      options().forEach((opt, i) => {
+        const b = bins[i]
+        if (!opt.hidden && b) chosen.push(b)
+      })
+      if (chosen.length === 0) return
+      const tag = unratedOnly
+        ? 'unrated'
+        : minStars === 0
+          ? 'filtered'
+          : minStars === MAX_STARS
+            ? '5star'
+            : `${minStars}plus`
+      const base = (name || 'library').replace(/\.mnlgxd(lib|prog)$/i, '')
+      downloadFile(`${base}-${tag}.mnlgxdlib`, buildLibrary(chosen))
+    })
+
+    bar.append(filterLabel, filterSel, countEl, exportBtn)
     list.before(bar)
 
     applyFilter()

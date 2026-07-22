@@ -255,6 +255,23 @@ xd-knob[data-param-key="modeDepth"]::part(label) {
   margin-inline-start: auto;
   color: var(--wa-color-text-quiet, #8a8a93);
 }
+.library-export {
+  background: var(--wa-color-surface-overlay, #2a2a31);
+  color: inherit;
+  border: 1px solid var(--wa-color-neutral-border-normal, #3a3a42);
+  border-radius: 4px;
+  padding: 0.2em 0.7em;
+  font: inherit;
+  cursor: pointer;
+}
+.library-export:hover:not(:disabled) {
+  border-color: var(--xd-knob-teal, #2dd4bf);
+  color: var(--xd-label-bright, #c4c4cc);
+}
+.library-export:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 
 #status-bar {
   margin-top: var(--wa-space-s, 0.75rem);
