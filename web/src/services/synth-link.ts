@@ -1,8 +1,9 @@
 // One Web-MIDI connection shared across the app (never open Web MIDI twice). The current program
 // is captured as `template` for load-to-hardware + the "Mine's better" feedback.
 
+import { connectBridge } from './bridge-midi'
 import { createLivePatch } from './live-patch'
-import { connectMidi, type MidiController } from './midi'
+import { connectMidi, type MidiController, type MidiHandlers } from './midi'
 
 export interface SynthLink {
   /** Re-request the current program (the viewer's Refresh button + program changes). */
@@ -30,20 +31,25 @@ export function createSynthLink(): SynthLink {
     while (dumpWaiters.length) dumpWaiters.shift()?.(prog)
   }
 
+  const handlers: MidiHandlers = {
+    // Panel is last-load-wins (file / synth dump / generated patch).
+    onDump: (prog) => {
+      live.loadDump(prog)
+      settle(prog)
+    },
+    // Poll refreshes the captured program only; don't re-emit patch:load so a generated patch isn't clobbered.
+    onPoll: (prog) => {
+      settle(prog)
+    },
+    onControlChange: live.controlChange,
+  }
+
   void (async () => {
+    // Web MIDI in a capable browser; else the local bridge (Ableton WKWebView, Safari/iOS).
     midi =
-      (await connectMidi({
-        // Panel is last-load-wins (file / synth dump / generated patch).
-        onDump: (prog) => {
-          live.loadDump(prog)
-          settle(prog)
-        },
-        // Poll refreshes the captured program only; don't re-emit patch:load so a generated patch isn't clobbered.
-        onPoll: (prog) => {
-          settle(prog)
-        },
-        onControlChange: live.controlChange,
-      })) ?? undefined
+      (await connectMidi(handlers)) ??
+      (await connectBridge(handlers)) ??
+      undefined
   })()
 
   return {

@@ -10,6 +10,22 @@
     <div id="app">
       <header class="midi-bar">
         <h1 class="embed-title">minilogue xd viewer</h1>
+        <button id="random-patch" class="random-patch" type="button" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2" />
+            <circle cx="8" cy="8" r="1.6" fill="currentColor" />
+            <circle cx="16" cy="8" r="1.6" fill="currentColor" />
+            <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+            <circle cx="8" cy="16" r="1.6" fill="currentColor" />
+            <circle cx="16" cy="16" r="1.6" fill="currentColor" />
+          </svg>
+          Random
+        </button>
+        <span id="midi-status" class="midi-status" role="status" data-state="requesting">
+          <span class="midi-dot"></span>
+          <span class="midi-text">Connecting to MIDI…</span>
+        </span>
+        <button id="midi-refresh" class="midi-refresh" type="button" hidden>Refresh</button>
         <a class="embed-web-link" href="https://minilogue-xd-viewer.vercel.app/">Web version<span class="visually-hidden"> (opens the web app in your browser)</span><svg class="ext-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>
         <button id="embed-close" type="button" class="embed-close">Close</button>
       </header>

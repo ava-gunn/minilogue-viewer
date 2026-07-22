@@ -7,22 +7,12 @@ import { emit, on } from '../events/bus'
 import { AUDIO_ACCEPT } from '../events/files'
 import { matchAudioRawById } from '../inference'
 import { rawByIdToPatch } from '../inference/decode'
-import { readRawById, writeProgBin } from '../parser/write'
-import { type Rating, submitContribution } from '../services/contribute'
+import { writeProgBin } from '../parser/write'
 import type { SynthLink } from '../services/synth-link'
 import { toast } from '../services/toast'
-import {
-  mountTurnstile,
-  resetTurnstile,
-  turnstileEnabled,
-  turnstileToken,
-} from '../services/turnstile'
 
-const STEPS = ['upload', 'patch', 'try', 'feedback'] as const
+const STEPS = ['upload', 'patch', 'try'] as const
 type Step = (typeof STEPS)[number]
-
-// Label stored with each contribution to record which matcher produced it.
-const BUILTIN_MODEL = 'builtin-onnx'
 
 const byId = <T extends HTMLElement>(id: string): T | null =>
   document.getElementById(id) as T | null
@@ -67,10 +57,6 @@ export function initResynth(link: SynthLink): void {
 
   const feedback = byId('resynth-feedback')
   const result = byId('resynth-result')
-  const pitchSel = byId<HTMLSelectElement>('resynth-pitch')
-  const asIsBtn = byId<HTMLButtonElement>('resynth-asis')
-  const mineBtn = byId<HTMLButtonElement>('resynth-mine')
-  const turnstileBox = byId('resynth-turnstile')
 
   const setStatus = (msg: string): void => {
     if (status) status.textContent = msg
@@ -85,7 +71,6 @@ export function initResynth(link: SynthLink): void {
       else li.removeAttribute('aria-current')
     }
   }
-  let connected = false
   const updateLoad = (): void => {
     // Read live state (a captured template implies a connected+dumped synth) rather than the
     // `connected` event — initResynth is lazy and can miss it if MIDI connected before opening.
@@ -254,7 +239,6 @@ export function initResynth(link: SynthLink): void {
         result.textContent = 'Patch loaded — try it on your minilogue xd.'
       }
       feedback?.removeAttribute('hidden')
-      if (turnstileBox) void mountTurnstile(turnstileBox)
       setStep('try')
       setStatus('Done.')
       updateLoad()
@@ -268,76 +252,9 @@ export function initResynth(link: SynthLink): void {
     }
   })
 
-  // 'adjusted' uploads the synth's live current program — a fresh dump, so every param reflects the
-  // actual hardware: the values you adjusted AND the preset values for everything you didn't touch.
-  const submit = async (kind: Rating): Promise<void> => {
-    if (!file) return
-    let submitRaw = rawById
-    if (kind === 'adjusted') {
-      if (!link.getTemplate()) {
-        toast(
-          'Connect your minilogue xd and load the patch first so we can capture your changes.',
-          'danger',
-        )
-        return
-      }
-      const fresh = (await link.requestDump()) ?? link.getTemplate()
-      if (!fresh) return
-      submitRaw = readRawById(fresh) // full current hardware edit buffer, every param
-    }
-    if (!submitRaw) return
-
-    if (asIsBtn) asIsBtn.disabled = true
-    if (mineBtn) mineBtn.disabled = true
-    const markDone = (): void => {
-      setStep('feedback')
-      stepEls
-        .find((li) => li.dataset.step === 'feedback')
-        ?.classList.add('done')
-    }
-    const reenable = (): void => {
-      if (asIsBtn) asIsBtn.disabled = false
-      if (mineBtn) mineBtn.disabled = false
-    }
-
-    const tsToken = turnstileToken()
-    if (turnstileEnabled() && !tsToken) {
-      setStatus('Please complete the verification challenge first.')
-      reenable()
-      return
-    }
-    setStatus('Sending feedback…')
-    try {
-      const id = await submitContribution({
-        file,
-        rawById: submitRaw,
-        name: patchName,
-        pitchMidi: Number(pitchSel?.value ?? 60),
-        model: BUILTIN_MODEL,
-        engine: 'builtin',
-        rating: kind,
-        turnstileToken: tsToken,
-      })
-      resetTurnstile()
-      markDone()
-      setStatus(
-        `Thanks! ${kind === 'adjusted' ? 'Your version' : 'Feedback'} sent (${id}).`,
-      )
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      setStatus('')
-      toast(`Could not send feedback: ${message}`, 'danger')
-      reenable()
-    }
-  }
-  asIsBtn?.addEventListener('click', () => void submit('as-is'))
-  mineBtn?.addEventListener('click', () => void submit('adjusted'))
-
-  // MIDI status + live mirroring are owned by the viewer's shared synth link; we only track connection here.
-  on('midi:status', ({ state }) => {
-    connected = state === 'connected'
+  // Keep the Load button in sync as the synth connects/disconnects.
+  on('midi:status', () => {
     updateLoad()
-    mineBtn?.toggleAttribute('hidden', !connected)
   })
   loadBtn?.addEventListener('click', () => {
     const t = link.getTemplate()
