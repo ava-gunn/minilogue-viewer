@@ -18,6 +18,18 @@ export interface SynthLink {
   requestDump: () => Promise<Uint8Array | undefined>
 }
 
+// The 12-byte program name lives at prog_bin offset 4. A change there means a *different* program
+// was selected on the synth — not just a knob edit (which keeps the name) — so the poll should
+// re-render. Comparing the name (not every byte) keeps in-place edits from clobbering the live
+// needles every 1.5s.
+const NAME_START = 4
+const NAME_END = 16
+function sameProgram(a: Uint8Array | undefined, b: Uint8Array): boolean {
+  if (!a) return false
+  for (let i = NAME_START; i < NAME_END; i++) if (a[i] !== b[i]) return false
+  return true
+}
+
 export function createSynthLink(): SynthLink {
   const live = createLivePatch()
   let template: Uint8Array | undefined
@@ -37,8 +49,11 @@ export function createSynthLink(): SynthLink {
       live.loadDump(prog)
       settle(prog)
     },
-    // Poll refreshes the captured program only; don't re-emit patch:load so a generated patch isn't clobbered.
+    // Poll refreshes the captured program only — don't re-emit patch:load, so a generated/loaded
+    // patch isn't clobbered. Exception: if the *program itself* changed on the hardware (a new
+    // program whose Program Change wasn't sent, or that lost the pendingMode race), render it.
     onPoll: (prog) => {
+      if (!sameProgram(template, prog)) live.loadDump(prog)
       settle(prog)
     },
     onControlChange: live.controlChange,

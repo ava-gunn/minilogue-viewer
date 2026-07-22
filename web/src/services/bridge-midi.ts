@@ -17,6 +17,10 @@ const BRIDGE_URL = import.meta.env.VITE_BRIDGE_URL || 'ws://127.0.0.1:8766'
 const DEVICE = 'minilogue xd (bridge)'
 const ACTIVITY_TIMEOUT = 4000
 const RECONNECT_MS = 2000
+const POLL_MS = 1500
+// Hold the full-dump poll while a knob is actively streaming CC — the ~1.2 KB dump round-trip
+// would otherwise hitch the live needle stream every 1.5s.
+const CC_QUIET_MS = 1000
 
 type MidiStatus = AppEventMap['midi:status']
 
@@ -45,6 +49,7 @@ export async function connectBridge(
   let refreshTimer: ReturnType<typeof setTimeout> | undefined
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined
   let lastSeen = 0
+  let lastCcAt = 0
   let lastState: MidiStatus['state'] | '' = ''
   let disposed = false
 
@@ -94,6 +99,7 @@ export async function connectBridge(
     } else if (status >= 0xf8) {
       // System real-time (Active Sensing) — liveness only.
     } else if ((status & 0xf0) === 0xb0 && data.length >= 3) {
+      lastCcAt = Date.now()
       handlers.onControlChange(data[1], data[2])
     } else if ((status & 0xf0) === 0xc0) {
       refresh(false) // program change → re-pull values, leave live needles
@@ -150,11 +156,15 @@ export async function connectBridge(
 
   const statusInterval = setInterval(evaluateStatus, 1000)
   const pollInterval = setInterval(() => {
-    if (isOpen()) {
-      pendingMode = 'poll'
-      sendRequest()
-    }
-  }, 1500)
+    // Skip while a knob is streaming CC (don't hitch the live needles) and while a
+    // connect/refresh/program-change dump is still in flight (don't steal its pendingMode and
+    // swallow the render as a silent poll). A stale 'poll' can be re-fired, so it self-heals.
+    if (!isOpen()) return
+    if (pendingMode === 'full' || pendingMode === 'program') return
+    if (Date.now() - lastCcAt < CC_QUIET_MS) return
+    pendingMode = 'poll'
+    sendRequest()
+  }, POLL_MS)
 
   function dispose(): void {
     disposed = true

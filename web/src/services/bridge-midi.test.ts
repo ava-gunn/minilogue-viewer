@@ -106,6 +106,42 @@ it('sendProgram broadcasts 16 channels when open', async () => {
   ctrl?.dispose()
 })
 
+it('polls the current program when idle', async () => {
+  const ctrl = await connectBridge({
+    onDump: vi.fn(),
+    onPoll: vi.fn(),
+    onControlChange: vi.fn(),
+  })
+  const ws = lastWs()
+  ws.fireOpen()
+  vi.advanceTimersByTime(120) // connect refresh request goes out
+  ws.fireMessage(currentProgramDump(progBin(), 0)) // consume it -> pendingMode idle
+  ws.sent.length = 0
+  vi.advanceTimersByTime(1500) // poll tick, nothing recent -> fires (16 channels)
+  expect(ws.sent).toHaveLength(16)
+  ctrl?.dispose()
+})
+
+it('defers the poll while Control Change is streaming', async () => {
+  const ctrl = await connectBridge({
+    onDump: vi.fn(),
+    onPoll: vi.fn(),
+    onControlChange: vi.fn(),
+  })
+  const ws = lastWs()
+  ws.fireOpen()
+  vi.advanceTimersByTime(120)
+  ws.fireMessage(currentProgramDump(progBin(), 0)) // pendingMode idle
+  ws.sent.length = 0
+  vi.advanceTimersByTime(1000)
+  ws.fireMessage(new Uint8Array([0xb0, 43, 100])) // a knob turn — arms the CC-quiet window
+  vi.advanceTimersByTime(500) // poll tick <1s after the CC -> skipped
+  expect(ws.sent).toHaveLength(0)
+  vi.advanceTimersByTime(1500) // CC now quiet -> poll fires
+  expect(ws.sent).toHaveLength(16)
+  ctrl?.dispose()
+})
+
 it('still returns a controller when the bridge is down (will retry)', async () => {
   const ctrl = await connectBridge({
     onDump: vi.fn(),

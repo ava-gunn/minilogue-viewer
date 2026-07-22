@@ -81,7 +81,11 @@ export async function connectMidi(
   // Firefox keeps a switched-off port listed as 'connected' and may not fire statechange). A
   // powered-on minilogue xd streams Active Sensing, so silence past ACTIVITY_TIMEOUT means it's off.
   const ACTIVITY_TIMEOUT = 4000
+  // Hold the full-dump poll while a knob is actively streaming CC — the ~1.2 KB dump round-trip
+  // would otherwise hitch the live needle stream every 1.5s.
+  const CC_QUIET_MS = 1000
   let lastSeen = 0
+  let lastCcAt = 0
   let lastState: MidiStatus['state'] | '' = ''
   let lastDevice: string | undefined
   const attachedInputs = new WeakSet<MIDIInput>()
@@ -215,6 +219,7 @@ export async function connectMidi(
       // Non-SysEx channel message — Web MIDI delivers each as one complete event.
       const kind = status & 0xf0
       if (kind === 0xb0 && data.length >= 3) {
+        lastCcAt = Date.now()
         handlers.onControlChange(data[1], data[2])
       } else if (kind === 0xc0) {
         // Program change → re-pull program values but leave the live needles (seedLive false).
@@ -258,7 +263,12 @@ export async function connectMidi(
   // Poll so SysEx-only params (voice mode) track the synth, which doesn't transmit them as CC.
   // Also re-scans for late-appearing ports.
   const pollInterval = setInterval(() => {
-    attachInputs()
+    attachInputs() // re-scan for late-appearing ports (cheap; always)
+    // Skip while a knob is streaming CC (don't hitch the live needles) and while a
+    // connect/refresh/program-change dump is still in flight (don't steal its pendingMode and
+    // swallow the render as a silent poll). A stale 'poll' can be re-fired, so it self-heals.
+    if (pendingMode === 'full' || pendingMode === 'program') return
+    if (Date.now() - lastCcAt < CC_QUIET_MS) return
     pendingMode = 'poll'
     sendRequest()
   }, 1500)
