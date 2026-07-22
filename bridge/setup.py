@@ -14,6 +14,7 @@ setup(
     options={
         "py2app": {
             "argv_emulation": False,
+            "iconfile": "icon.icns",  # the 🎹 keyboard, matching the menu-bar icon
             "packages": ["rtmidi", "websockets"],
             "plist": {
                 "CFBundleName": "minilogue xd bridge",
