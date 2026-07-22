@@ -47,15 +47,16 @@ jobs:
         with:
           python-version: "3.12" # pyobjc/rtmidi wheels + a framework build for py2app
 
-      - name: Build the bridge .app
+      - name: Build + zip the bridge .app
         working-directory: bridge
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt py2app
           python setup.py py2app
-
-      - name: Zip the .app (ditto preserves the bundle)
-        run: ditto -c -k --keepParent bridge/dist/bridge.app "minilogue-xd-bridge-${GITHUB_REF_NAME}.zip"
+          ls -la dist
+          # py2app names the bundle from CFBundleName ("minilogue xd bridge.app"), so glob it.
+          app=$(ls -d dist/*.app | head -1)
+          ditto -c -k --keepParent "$app" "../minilogue-xd-bridge-${GITHUB_REF_NAME}.zip"
 
       - uses: softprops/action-gh-release@v2
         with:
