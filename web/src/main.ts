@@ -39,29 +39,6 @@ randomBtn?.addEventListener('click', () => {
   if (template) link.sendProgram(writeProgBin(template, raw))
 })
 
-// Resynthesis: the ONNX matcher bundle is lazy-imported on first click.
-const openBtn = document.getElementById('resynth-open')
-const form = document.getElementById('resynth-form')
+// Resynthesis is disabled globally — no entry point. The program library still opens on load.
 const library = document.getElementById('library-panel')
-
-let inited = false
-
-const show = (what: 'form' | 'library'): void => {
-  form?.toggleAttribute('hidden', what !== 'form')
-  library?.toggleAttribute('hidden', what !== 'library')
-  openBtn?.setAttribute('aria-expanded', String(what === 'form'))
-}
-
-on('file:parsed-lib', () => show('library'))
-
-openBtn?.addEventListener('click', async () => {
-  if (!inited) {
-    const { initResynth } = await import('./sections/resynth')
-    initResynth(link)
-    inited = true
-  }
-  show('form')
-})
-
-// Deep link: /?resynth=1 (Ableton embed / /resynth redirect) opens the form.
-if (new URLSearchParams(location.search).has('resynth')) openBtn?.click()
+on('file:parsed-lib', () => library?.removeAttribute('hidden'))

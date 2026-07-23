@@ -4,9 +4,6 @@
   "buildCommand": "pnpm build",
   "outputDirectory": "dist",
   "cleanUrls": true,
-  "redirects": [
-    { "source": "/resynth", "destination": "/?resynth=1", "permanent": false }
-  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -23,7 +20,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' ws://127.0.0.1:8766; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+          "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws://127.0.0.1:8766; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
         }
       ]
     }
