@@ -13,15 +13,15 @@ describe('clamp01', () => {
 })
 
 describe('knobAngle', () => {
-  it('maps 0..1 across the 270° sweep', () => {
-    expect(knobAngle(0)).toBe(-135)
+  it('maps 0..1 across the 300° sweep', () => {
+    expect(knobAngle(0)).toBe(-150)
     expect(knobAngle(0.5)).toBe(0)
-    expect(knobAngle(1)).toBe(135)
+    expect(knobAngle(1)).toBe(150)
   })
 
   it('clamps out-of-range input', () => {
-    expect(knobAngle(-1)).toBe(-135)
-    expect(knobAngle(5)).toBe(135)
+    expect(knobAngle(-1)).toBe(-150)
+    expect(knobAngle(5)).toBe(150)
   })
 })
 
