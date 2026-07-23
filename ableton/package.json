@@ -1,7 +1,7 @@
 {
   "name": "minilogue-xd-viewer-ableton",
   "private": true,
-  "version": "4.3.0",
+  "version": "4.4.0",
   "type": "module",
   "main": "dist/extension.js",
   "engines": {
