@@ -46,6 +46,27 @@ export function closeWindow(): void {
   if (!sendAndClose({ action: 'close' })) window.close()
 }
 
+/** Base64-encode bytes for transport through the string-only host channel. */
+function toBase64(bytes: Uint8Array): string {
+  let bin = ''
+  const CHUNK = 0x8000
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+  }
+  return btoa(bin)
+}
+
+/** Ask the Ableton host to save bytes to a file (it writes to Downloads and reveals it). Returns
+ *  false in a normal browser so callers fall back to a download. Closes the modal — the SDK's only
+ *  host channel (close_and_send) does. */
+export function saveFile(filename: string, bytes: Uint8Array): boolean {
+  return sendAndClose({
+    action: 'save-file',
+    filename,
+    contents: toBase64(bytes),
+  })
+}
+
 export function initEmbed(): void {
   const link = document.querySelector<HTMLAnchorElement>('.embed-web-link')
   if (link) {

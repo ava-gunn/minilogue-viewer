@@ -1,6 +1,7 @@
 import { emit, on } from '../events/bus'
 import { parseLibrary } from '../parser'
 import { buildLibrary } from '../parser/write-library'
+import { saveFile } from '../services/host-bridge'
 import { getRating, MAX_STARS, setRating } from '../services/ratings'
 import type { MinilogueXDPatch } from '../types/synth'
 
@@ -232,7 +233,12 @@ export function initLibrary(): void {
             ? '5star'
             : `${minStars}plus`
       const base = (name || 'library').replace(/\.mnlgxd(lib|prog)$/i, '')
-      downloadFile(`${base}-${tag}.mnlgxdlib`, buildLibrary(chosen))
+      const outName = `${base}-${tag}.mnlgxdlib`
+      const out = buildLibrary(chosen)
+      // The Ableton WebView can't trigger a browser download (it navigates + breaks the modal), so
+      // route through the host, which writes to Downloads + reveals it. saveFile returns false in a
+      // normal browser → fall back to the download there.
+      if (!saveFile(outName, out)) downloadFile(outName, out)
     })
 
     bar.append(filterLabel, filterSel, countEl, exportBtn)

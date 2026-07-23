@@ -1,7 +1,8 @@
 import { initialize, type ActivationContext } from "@ableton-extensions/sdk"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
-import { join } from "node:path"
-import { openBrowser } from "./open-browser.js"
+import { homedir } from "node:os"
+import { basename, join } from "node:path"
+import { openBrowser, revealFile } from "./open-browser.js"
 import viewerHtml from "./viewer.generated.html"
 
 const VIEWER_ID = "minilogue-xd-viewer.open"
@@ -54,6 +55,20 @@ async function saveRatings(dir: string | undefined, ratings: unknown): Promise<v
   }
 }
 
+/** Write an exported library (base64) to the user's Downloads folder and reveal it. The WebView
+    can't download, so the viewer hands the bytes back via close_and_send and the host writes them. */
+async function saveExport(filename: string, contents: string): Promise<void> {
+  const safe = basename(filename).replace(/[^A-Za-z0-9._-]/g, "_")
+  const name = /\.mnlgxdlib$/i.test(safe) ? safe : `${safe}.mnlgxdlib`
+  try {
+    const out = join(homedir(), "Downloads", name)
+    await writeFile(out, Buffer.from(contents, "base64"))
+    revealFile(out)
+  } catch (err) {
+    console.error("[minilogue-xd-viewer] failed to export library", err)
+  }
+}
+
 export function activate(activation: ActivationContext) {
   const context = initialize(activation, "1.0.0")
 
@@ -81,10 +96,18 @@ export function activate(activation: ActivationContext) {
         action?: string
         url?: string
         ratings?: Record<string, number>
+        filename?: string
+        contents?: string
       }
       await saveRatings(storageDir, data.ratings)
       if (data.action === "open-url" && typeof data.url === "string") {
         openBrowser(data.url)
+      } else if (
+        data.action === "save-file" &&
+        typeof data.filename === "string" &&
+        typeof data.contents === "string"
+      ) {
+        await saveExport(data.filename, data.contents)
       }
     } catch {
       // dialog closed without a result (e.g. native window close) — this session's ratings aren't saved
