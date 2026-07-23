@@ -14,9 +14,9 @@ export function adoptStyles(root: ShadowRoot, css: string): void {
 
 export const clamp01 = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n)
 
-// XD knobs sweep 300° total: -150° at min → +150° at max (0° points up), matching the ~300°
-// travel of the hardware pots — a 60° dead zone at 6 o'clock (was 270°, a wider 90° gap).
-export function knobAngle(value: number, sweep = 300): number {
+// XD knobs sweep 285° total: -142.5° at min → +142.5° at max (0° points up) — a 75° dead zone at
+// 6 o'clock, splitting the original 270° (90° gap) and the hardware-matched 300° (60° gap).
+export function knobAngle(value: number, sweep = 285): number {
   return -sweep / 2 + clamp01(value) * sweep
 }
 
