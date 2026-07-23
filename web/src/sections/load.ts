@@ -207,6 +207,7 @@ export function initLibrary(): void {
     })
     countEl = document.createElement('span')
     countEl.className = 'library-count'
+    countEl.setAttribute('role', 'status') // announce the "N of M" count after filtering
 
     // Export the currently-shown patches as a fresh .mnlgxdlib (lossless — reuses the source bytes).
     exportBtn = document.createElement('button')

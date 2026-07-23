@@ -30,7 +30,7 @@
     <div id="app">
       <h1 class="visually-hidden">minilogue xd patch viewer</h1>
       <header class="midi-bar">
-        <button id="resynth-open" class="resynth-open" type="button" aria-controls="resynth-form">
+        <button id="resynth-open" class="resynth-open" type="button" aria-controls="resynth-form" aria-expanded="false">
           Resynthesis
         </button>
         <button id="random-patch" class="random-patch" type="button" hidden>
@@ -57,7 +57,7 @@
         </button>
       </header>
 
-      <main id="main">
+      <main id="main" tabindex="-1">
         <div id="panel-root"></div>
 
         <!-- Below the synth: the program library OR the resynth form — whichever was opened last. -->

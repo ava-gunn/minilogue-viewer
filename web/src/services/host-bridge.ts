@@ -61,4 +61,9 @@ export function initEmbed(): void {
   document
     .querySelector<HTMLButtonElement>('#embed-close')
     ?.addEventListener('click', () => closeWindow())
+
+  // Escape closes the modal (dialog convention); the host manages focus return.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeWindow()
+  })
 }

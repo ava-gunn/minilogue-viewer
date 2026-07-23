@@ -50,6 +50,7 @@ function initStatus(): void {
     if (!bar) return
     const badge = document.createElement('wa-badge')
     badge.setAttribute('variant', 'danger')
+    badge.setAttribute('role', 'alert') // assertive: don't let errors sit behind polite updates
     badge.textContent = message
     bar.replaceChildren(badge)
     setTimeout(() => {

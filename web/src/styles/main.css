@@ -80,6 +80,15 @@
   opacity: 0;
   transform: translateY(-0.4rem);
 }
+/* Honour reduced-motion: keep the opacity fade, drop the positional slide (WCAG 2.3.3). */
+@media (prefers-reduced-motion: reduce) {
+  .toast,
+  .toast-in,
+  .toast-leaving {
+    transform: none;
+    transition: opacity 0.18s ease;
+  }
+}
 .toast-danger {
   border-inline-start-color: var(--wa-color-danger-fill-loud, #e5484d);
 }
@@ -104,10 +113,11 @@
   opacity: 1;
 }
 
-/* Shared action-button style — Random, Resynthesis, and Close are visually identical (single
-   source of truth so they can't drift). Sized to match the header bar so it doesn't grow. */
+/* Shared action-button style — Random, Resynthesis, Refresh, and Close are visually identical
+   (single source of truth so they can't drift). Sized to match the header bar so it doesn't grow. */
 .random-patch,
 .resynth-open,
+.midi-refresh,
 .embed-close {
   display: inline-flex;
   align-items: center;
@@ -124,11 +134,13 @@
 }
 .random-patch:hover:not(:disabled),
 .resynth-open:hover:not(:disabled),
+.midi-refresh:hover:not(:disabled),
 .embed-close:hover:not(:disabled) {
   border-color: var(--wa-color-neutral-50, #8a8a93);
 }
 .random-patch:disabled,
 .resynth-open:disabled,
+.midi-refresh:disabled,
 .embed-close:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -136,11 +148,13 @@
 /* inline-flex (author) beats the UA [hidden] rule, so re-hide explicitly. */
 .random-patch[hidden],
 .resynth-open[hidden],
+.midi-refresh[hidden],
 .embed-close[hidden] {
   display: none;
 }
 .random-patch svg,
 .resynth-open svg,
+.midi-refresh svg,
 .embed-close svg {
   display: block;
   width: 1.1em;

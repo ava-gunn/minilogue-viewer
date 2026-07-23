@@ -107,7 +107,10 @@ class XdWaveSelector extends HTMLElement {
       this.#build()
       this.#built = true
     }
-    if (!this.hasAttribute('decorative')) {
+    if (this.hasAttribute('decorative')) {
+      // Faceplate replica with no live data — hide its frozen role=img/aria-label from AT.
+      this.setAttribute('aria-hidden', 'true')
+    } else {
       this.#offs.push(
         onParam('param:change', this, (v) => this.#applyProgram(v)),
         onParam('param:live', this, (v) => this.#applyLive(v)),

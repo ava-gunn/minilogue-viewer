@@ -49,6 +49,7 @@ let inited = false
 const show = (what: 'form' | 'library'): void => {
   form?.toggleAttribute('hidden', what !== 'form')
   library?.toggleAttribute('hidden', what !== 'library')
+  openBtn?.setAttribute('aria-expanded', String(what === 'form'))
 }
 
 on('file:parsed-lib', () => show('library'))
