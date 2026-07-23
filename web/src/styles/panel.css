@@ -194,6 +194,11 @@ xd-knob[data-param-key="modeDepth"]::part(label) {
   font-size: 0.8rem;
   color: var(--wa-color-neutral-on-quiet, #b4b4bc);
 }
+/* The star filter toggles [hidden]; the author display:flex above beats the UA [hidden] rule,
+   so filtered-out options would keep showing. Re-hide them with a higher-specificity selector. */
+#program-list [role="option"][hidden] {
+  display: none;
+}
 #program-list [role="option"]:hover {
   background: var(--wa-color-surface-overlay, #2a2a31);
   border-color: var(--wa-color-neutral-border-normal, #3a3a42);
