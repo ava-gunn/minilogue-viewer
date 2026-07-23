@@ -34,12 +34,16 @@ const styles = `
     background: var(--xd-knob-teal, #2dd4bf);
     transform: translateX(-50%) rotate(var(--knob-angle, -135deg));
   }
-  /* Live needle: same length as program so equal values overlap; thinner, on top. */
+  /* Live needle: same length as program so equal values overlap; thinner, on top.
+     No transition — it mirrors the hardware in real time, so it must snap to each incoming
+     Control Change. Easing it (like the program needle) leaves it ~150ms behind and re-eases
+     on every CC, which reads as lag/stutter during a fast knob sweep (worse in WKWebView). */
   .indicator.live {
     height: 44%;
     width: 1.5px;
     background: var(--xd-knob-live, #f6a821);
     transform: translateX(-50%) rotate(var(--knob-angle-live, -135deg));
+    transition: none;
   }
   :host(:not([live])) .indicator.live { display: none; }
 
