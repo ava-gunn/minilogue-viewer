@@ -24,27 +24,7 @@
   vertical-align: -0.1em;
 }
 
-.embed-close {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4em;
-  font: inherit;
-  font-size: 0.85rem;
-  padding: 0.3em 0.95em;
-  color: var(--wa-color-text-normal, #e0e0e6);
-  background: transparent;
-  border: 1px solid var(--xd-divider, #44444e);
-  border-radius: var(--wa-border-radius-m, 6px);
-  cursor: pointer;
-}
-.embed-close:hover {
-  border-color: var(--wa-color-text-quiet, #8a8a93);
-}
-.embed-close svg {
-  display: block;
-  width: 1.05em;
-  height: 1.05em;
-}
+/* .embed-close uses the shared action-button style in main.css (identical to Random / Resynthesis). */
 
 /* Cap height so the list scrolls internally; window sized to fit this open (see VIEWER_HEIGHT). */
 #program-list {

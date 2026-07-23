@@ -104,8 +104,14 @@
   opacity: 1;
 }
 
-/* Matches .midi-refresh's size so the header bar doesn't grow / push the synth down. */
-.resynth-open {
+/* Shared action-button style — Random, Resynthesis, and Close are visually identical (single
+   source of truth so they can't drift). Sized to match the header bar so it doesn't grow. */
+.random-patch,
+.resynth-open,
+.embed-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
   padding: 0.3em 0.95em;
   font: inherit;
   font-size: 0.85rem;
@@ -116,12 +122,29 @@
   cursor: pointer;
   transition: border-color 0.15s ease;
 }
-.resynth-open:hover:not(:disabled) {
+.random-patch:hover:not(:disabled),
+.resynth-open:hover:not(:disabled),
+.embed-close:hover:not(:disabled) {
   border-color: var(--wa-color-neutral-50, #8a8a93);
 }
-.resynth-open:disabled {
+.random-patch:disabled,
+.resynth-open:disabled,
+.embed-close:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+/* inline-flex (author) beats the UA [hidden] rule, so re-hide explicitly. */
+.random-patch[hidden],
+.resynth-open[hidden],
+.embed-close[hidden] {
+  display: none;
+}
+.random-patch svg,
+.resynth-open svg,
+.embed-close svg {
+  display: block;
+  width: 1.1em;
+  height: 1.1em;
 }
 
 #resynth-form {
