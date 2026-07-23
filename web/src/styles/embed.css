@@ -25,6 +25,9 @@
 }
 
 .embed-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
   font: inherit;
   font-size: 0.85rem;
   padding: 0.3em 0.95em;
@@ -36,6 +39,11 @@
 }
 .embed-close:hover {
   border-color: var(--wa-color-text-quiet, #8a8a93);
+}
+.embed-close svg {
+  display: block;
+  width: 1.05em;
+  height: 1.05em;
 }
 
 /* Cap height so the list scrolls internally; window sized to fit this open (see VIEWER_HEIGHT). */

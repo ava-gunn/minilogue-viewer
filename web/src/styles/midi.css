@@ -46,6 +46,9 @@
 }
 
 .midi-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
   padding: 0.3em 0.95em;
   font: inherit;
   font-size: 0.85rem;
@@ -57,6 +60,15 @@
 }
 .midi-refresh:hover {
   border-color: var(--wa-color-text-quiet, #8a8a93);
+}
+/* inline-flex (author) beats the UA [hidden] rule (equal specificity), so re-hide explicitly. */
+.midi-refresh[hidden] {
+  display: none;
+}
+.midi-refresh svg {
+  display: block;
+  width: 1.05em;
+  height: 1.05em;
 }
 
 .midi-legend {
